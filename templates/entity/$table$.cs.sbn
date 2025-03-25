@@ -1,0 +1,25 @@
+namespace Domain.Entities;
+
+public class {{ entity_name }} : BaseLogDomain
+{
+{{~ for column in columns ~}}
+    public {{ 
+        if column.is_nullable and (column.type != "string") 
+            column.type | map_type | append "?"
+        else 
+            column.type | map_type 
+    }} {{ column.name | to_pascal_case }} { get; set; }
+{{~ end ~}}
+}
+
+public class {{ entity_name }}Model : BaseLogDomain
+{
+{{~ for column in columns ~}}
+    public {{ 
+        if column.is_nullable and (column.type != "string") 
+            column.type | map_type | append "?"
+        else 
+            column.type | map_type 
+    }} {{ column.name | to_pascal_case }} { get; set; }
+{{~ end ~}}
+}

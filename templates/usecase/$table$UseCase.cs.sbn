@@ -1,0 +1,116 @@
+﻿using Application.Models;
+using Application.Repositories;
+using Domain.Entities;
+using FluentResults;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Application.UseCases
+{
+    public class {{ entity_name }}UseCases : BaseUseCases<{{ entity_name }}>, I{{ entity_name }}UseCase
+    {
+        private readonly IUnitOfWork _unitOfWork;
+        protected override IBaseRepository<{{ entity_name }}> Repository => _unitOfWork.{{ entity_name }}Repository;
+
+        public {{ entity_name }}UseCases(IUnitOfWork unitOfWork) : base(unitOfWork)
+        {
+            _unitOfWork = unitOfWork;
+        }
+
+        public async Task<Result<{{ entity_name }}> GetOneByID(int id)
+        {
+            var result = await _unitOfWork.{{ entity_name }}Repository.GetOneByID(id);
+            if (result.IsFailed) return result;
+
+            {{~ if has_related_entities ~}}
+            // Загрузка связанных сущностей
+            {{~ for fk in foreign_keys ~}}
+            var {{ fk.ColumnName | to_camel_case }}Result = await _unitOfWork.{{ fk.ReferencedTable | to_pascal_case }}Repository.GetBy{{ entity_name | to_pascal_case }}Id(id);
+            if ({{ fk.ColumnName | to_camel_case }}Result.IsFailed) return Result.Fail({{ fk.ColumnName | to_camel_case }}Result.Errors);
+            result.Value.{{ fk.ReferencedTable | to_pascal_case }} = {{ fk.ColumnName | to_camel_case }}Result.Value;
+            {{~ end ~}}
+            {{~ end ~}}
+
+            return result;
+        }
+
+        public async Task<Result<{{ entity_name }}> Create({{ entity_name }} domain)
+        {
+            {{~ if has_status_field ~}}
+            // Установка начального статуса
+            var statusResult = await _unitOfWork.{{ status_table | to_pascal_case }}Repository.GetOneByCode("draft");
+            if (statusResult.IsFailed) return Result.Fail("Начальный статус не найден");
+            domain.StatusId = statusResult.Value.Id;
+            {{~ end ~}}
+
+            domain.CreatedAt = DateTime.Now;
+            domain.CreatedBy = 1; // TODO: Получить из контекста пользователя
+
+            var createResult = await _unitOfWork.{{ entity_name }}Repository.Add(domain);
+            if (createResult.IsFailed) return createResult;
+
+            {{~ if has_related_entities ~}}
+            // Обработка связанных сущностей
+            {{~ for fk in foreign_keys ~}}
+            foreach (var item in domain.{{ fk.ReferencedTable | to_pascal_case }})
+            {
+                item.{{ fk.ColumnName | to_pascal_case }} = createResult.Value.Id;
+                await _unitOfWork.{{ fk.ReferencedTable | to_pascal_case }}Repository.Add(item);
+            }
+            {{~ end ~}}
+            {{~ end ~}}
+
+            _unitOfWork.Commit();
+            return Result.Ok(domain);
+        }
+
+        public async Task<Result<{{ entity_name }}> Update({{ entity_name }} domain)
+        {
+            domain.UpdatedAt = DateTime.Now;
+            domain.UpdatedBy = 1; // TODO: Получить из контекста пользователя
+
+            var updateResult = await _unitOfWork.{{ entity_name }}Repository.Update(domain);
+            if (updateResult.IsFailed) return updateResult;
+
+            {{~ if has_related_entities ~}}
+            // Обновление связанных сущностей
+            {{~ for fk in foreign_keys ~}}
+            var existing{{ fk.ReferencedTable | to_pascal_case }} = await _unitOfWork.{{ fk.ReferencedTable | to_pascal_case }}Repository.GetBy{{ entity_name | to_pascal_case }}Id(domain.Id);
+            var existingIds = existing{{ fk.ReferencedTable | to_pascal_case }}?.Select(x => x.Id).ToList() ?? new List<int>();
+            var currentIds = domain.{{ fk.ReferencedTable | to_pascal_case }}?.Select(x => x.Id).ToList() ?? new List<int>();
+
+            // Удаление лишних
+            foreach (var id in existingIds.Except(currentIds))
+            {
+                await _unitOfWork.{{ fk.ReferencedTable | to_pascal_case }}Repository.Delete(id);
+            }
+
+            // Добавление/обновление
+            foreach (var item in domain.{{ fk.ReferencedTable | to_pascal_case }})
+            {
+                if (item.Id == 0)
+                {
+                    item.{{ fk.ColumnName | to_pascal_case }} = domain.Id;
+                    await _unitOfWork.{{ fk.ReferencedTable | to_pascal_case }}Repository.Add(item);
+                }
+                else
+                {
+                    await _unitOfWork.{{ fk.ReferencedTable | to_pascal_case }}Repository.Update(item);
+                }
+            }
+            {{~ end ~}}
+            {{~ end ~}}
+
+            _unitOfWork.Commit();
+            return Result.Ok(domain);
+        }
+
+        {{~ for fk in foreign_keys ~}}
+        public Task<List<{{ entity_name }}>> GetBy{{ fk.ColumnName | to_pascal_case }}({{ fk.ColumnType | map_type }} {{ fk.ColumnName | to_camel_case }})
+        {
+            return _unitOfWork.{{ entity_name }}Repository.GetBy{{ fk.ColumnName | to_pascal_case }}({{ fk.ColumnName | to_camel_case }});
+        }
+        {{~ end ~}}
+    }
+}
