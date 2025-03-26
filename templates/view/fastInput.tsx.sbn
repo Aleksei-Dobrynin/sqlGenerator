@@ -1,0 +1,177 @@
+﻿// {{ entity_name }}FastInputView.tsx.sbn
+import React, { FC, useEffect } from "react";
+import { Card, CardContent, Divider, Paper, Grid, Container, IconButton, Box } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { observer } from "mobx-react";
+import LookUp from "components/LookUp";
+import CustomTextField from "components/TextField";
+import DateTimeField from "components/DateTimeField";
+import CustomButton from "components/Button";
+import store from "./store";
+import storeList from "./../{{ entity_name }}ListView/store";
+import CreateIcon from "@mui/icons-material/Create";
+import DeleteIcon from "@mui/icons-material/Delete";
+
+type {{ entity_name }}Props = {
+  children?: React.ReactNode;
+  isPopup?: boolean;
+  mainId: number;
+};
+
+const {{ entity_name }}FastInputView: FC<{{ entity_name }}Props> = observer((props) => {
+  const { t } = useTranslation();
+  
+  useEffect(() => {
+    if (props.mainId !== 0 && storeList.mainId !== props.mainId) {
+      storeList.mainId = props.mainId;
+      storeList.load{{ entity_name_plural }}();
+    }
+  }, [props.mainId]);
+
+  const columns = [
+    {% for column in columns %}
+    {
+      field: '{{ column.name | to_camel_case }}',
+      headerName: t('label:{{ entity_name }}ListView.{{ column.name | to_camel_case }}'),
+      {% if column.foreign_key %}
+      render: (entity) => entity.{{ column.name | to_camel_case }}NavName,
+      {% endif %}
+    },
+    {% endfor %}
+  ];
+
+  return (
+    <Container>
+      <Card component={Paper} elevation={5}>
+        <CardContent>
+          <Box sx={{ m: 1 }}>
+            <h3>{t("label:{{ entity_name }}AddEditView.entityTitle")}</h3>
+          </Box>
+          <Divider />
+          
+          {/* Таблица */}
+          <Grid container direction="row" justifyContent="center" alignItems="center" spacing={1}>
+            {columns.map((col) => (
+              <Grid item xs key={col.field}>
+                <strong>{col.headerName}</strong>
+              </Grid>
+            ))}
+            <Grid item xs={1}></Grid>
+          </Grid>
+          <Divider />
+          
+          {storeList.data.map((entity) => (
+            <React.Fragment key={entity.id}>
+              <Grid container direction="row" justifyContent="center" alignItems="center" spacing={1}>
+                {columns.map((col) => (
+                  <Grid item xs key={col.field}>
+                    {col.render ? col.render(entity) : entity[col.field]}
+                  </Grid>
+                ))}
+                <Grid item xs={1}>
+                  {!storeList.isEdit && (
+                    <>
+                      <IconButton onClick={() => {
+                        storeList.setFastInputIsEdit(true);
+                        store.doLoad(entity.id);
+                      }}>
+                        <CreateIcon />
+                      </IconButton>
+                      <IconButton onClick={() => storeList.delete{{ entity_name }}(entity.id)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </>
+                  )}
+                </Grid>
+              </Grid>
+              <Divider />
+            </React.Fragment>
+          ))}
+
+          {/* Форма редактирования/добавления */}
+          {storeList.isEdit && (
+            <Grid container spacing={3} sx={{ mt: 2 }}>
+              {% for column in columns %}
+                {% if column.foreign_key %}
+              <Grid item md={12} xs={12}>
+                <LookUp
+                  value={store.{{ column.name | to_camel_case }} }
+                  onChange={(e) => store.handleChange(e)}
+                  name="{{ column.name | to_camel_case }}"
+                  data={store.{{ column.foreign_key.referenced_table | to_camel_case }}s}
+                  label={t('label:{{ entity_name }}AddEditView.{{ column.name | to_camel_case }}')}
+                  helperText={store.errors.{{ column.name | to_camel_case }}}
+                  error={!!store.errors.{{ column.name | to_camel_case }}}
+                />
+              </Grid>
+                {% elif column.type == 'timestamp' %}
+              <Grid item md={12} xs={12}>
+                <DateTimeField
+                  value={store.{{ column.name | to_camel_case }} }
+                  onChange={(e) => store.handleChange(e)}
+                  name="{{ column.name | to_camel_case }}"
+                  label={t('label:{{ entity_name }}AddEditView.{{ column.name | to_camel_case }}')}
+                  helperText={store.errors.{{ column.name | to_camel_case }}}
+                  error={!!store.errors.{{ column.name | to_camel_case }}}
+                />
+              </Grid>
+                {% else %}
+              <Grid item md={12} xs={12}>
+                <CustomTextField
+                  value={store.{{ column.name | to_camel_case }} }
+                  onChange={(e) => store.handleChange(e)}
+                  name="{{ column.name | to_camel_case }}"
+                  label={t('label:{{ entity_name }}AddEditView.{{ column.name | to_camel_case }}')}
+                  helperText={store.errors.{{ column.name | to_camel_case }}}
+                  error={!!store.errors.{{ column.name | to_camel_case }}}
+                />
+              </Grid>
+                {% endif %}
+              {% endfor %}
+
+              <Grid item xs={12} display="flex" justifyContent="flex-end">
+                <CustomButton
+                  variant="contained"
+                  onClick={() => {
+                    store.onSaveClick(() => {
+                      storeList.setFastInputIsEdit(false);
+                      storeList.load{{ entity_name_plural }}();
+                      store.clearStore();
+                    });
+                  }}
+                >
+                  {t("common:save")}
+                </CustomButton>
+                <CustomButton
+                  variant="contained"
+                  onClick={() => {
+                    storeList.setFastInputIsEdit(false);
+                    store.clearStore();
+                  }}
+                >
+                  {t("common:cancel")}
+                </CustomButton>
+              </Grid>
+            </Grid>
+          )}
+
+          {!storeList.isEdit && (
+            <Grid item display="flex" justifyContent="flex-end" sx={{ mt: 2 }}>
+              <CustomButton
+                variant="contained"
+                onClick={() => {
+                  storeList.setFastInputIsEdit(true);
+                  store.doLoad(0);
+                }}
+              >
+                {t("common:add")}
+              </CustomButton>
+            </Grid>
+          )}
+        </CardContent>
+      </Card>
+    </Container>
+  );
+});
+
+export default {{ entity_name }}FastInputView;
