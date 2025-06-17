@@ -175,6 +175,9 @@ namespace SQLFileGenerator
 
                 // Добавляем функцию для преобразования в PascalCase
                 scriptObject.Import("to_pascal_case", new Func<string, string>(StringExtensions.ToPascalCase));
+                scriptObject.Import("to_camel_case", new Func<string, string>(StringExtensions.ToCamelCase));
+                scriptObject.Import("to_snake_case", new Func<string, string>(StringExtensions.ToSnakeCase));
+
 
                 var context = new TemplateContext();
                 context.PushGlobal(scriptObject);

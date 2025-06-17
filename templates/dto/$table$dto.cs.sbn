@@ -1,4 +1,3 @@
-
 using System;
 using Newtonsoft.Json;
 namespace WebApi.Dtos
@@ -6,20 +5,19 @@ namespace WebApi.Dtos
     public class Get{{ entity_name }}Response
     {
 {{~ for column in columns ~}}
-        [JsonProperty("{{ column.name }}")]
-        public {{ 
-            if column.is_nullable and (column.type != "string") 
-                column.type | map_type | append "?"
-            else 
-                column.type | map_type 
-        }} {{ column.name | string.pascalcase }} { get; set; }
+        [JsonProperty("{{ column.Name }}")]
+        {{~ if column.IsNullable && column.CSharpType != "string" ~}}
+        public {{ column.CSharpType }}? {{ column.Name   }} { get; set; }
+        {{~ else ~}}
+        public {{ column.CSharpType }} {{ column.Name   }} { get; set; }
+        {{~ end ~}}
 {{~ end ~}}
         internal static Get{{ entity_name }}Response FromDomain(Domain.Entities.{{ entity_name }} domain)
         {
             return new Get{{ entity_name }}Response
             {
 {{~ for column in columns ~}}
-                {{ column.name | string.pascalcase }} = domain.{{ column.name | string.pascalcase }},
+                {{ column.Name   }} = domain.{{ column.Name   }},
 {{~ end ~}}
             };
         }
@@ -27,14 +25,13 @@ namespace WebApi.Dtos
     public class Create{{ entity_name }}Request
     {
 {{~ for column in columns ~}}
-        {{~ if column.name != "id" and column.name != "created_at" and column.name != "updated_at" ~}}
-        [JsonProperty("{{ column.name }}")]
-        public {{ 
-            if column.is_nullable and (column.type != "string") 
-                column.type | map_type | append "?"
-            else 
-                column.type | map_type 
-        }} {{ column.name | string.pascalcase }} { get; set; }
+        {{~ if column.Name != "id" && column.Name != "created_at" && column.Name != "updated_at" ~}}
+        [JsonProperty("{{ column.Name }}")]
+        {{~ if column.IsNullable && column.CSharpType != "string" ~}}
+        public {{ column.CSharpType }}? {{ column.Name   }} { get; set; }
+        {{~ else ~}}
+        public {{ column.CSharpType }} {{ column.Name   }} { get; set; }
+        {{~ end ~}}
         {{~ end ~}}
 {{~ end ~}}
         internal Domain.Entities.{{ entity_name }} ToDomain()
@@ -42,8 +39,8 @@ namespace WebApi.Dtos
             return new Domain.Entities.{{ entity_name }}
             {
 {{~ for column in columns ~}}
-                {{~ if column.name != "id" and column.name != "created_at" and column.name != "updated_at" ~}}
-                {{ column.name | string.pascalcase }} = {{ column.name | string.pascalcase }},
+                {{~ if column.Name != "id" && column.Name != "created_at" && column.Name != "updated_at" ~}}
+                {{ column.Name   }} = {{ column.Name   }},
                 {{~ end ~}}
 {{~ end ~}}
             };
@@ -54,14 +51,13 @@ namespace WebApi.Dtos
         [JsonProperty("id")]
         public int Id { get; set; }
 {{~ for column in columns ~}}
-        {{~ if column.name != "id" and column.name != "created_at" ~}}
-        [JsonProperty("{{ column.name }}")]
-        public {{ 
-            if column.is_nullable and (column.type != "string") 
-                column.type | map_type | append "?"
-            else 
-                column.type | map_type 
-        }} {{ column.name | string.pascalcase }} { get; set; }
+        {{~ if column.Name != "id" && column.Name != "created_at" ~}}
+        [JsonProperty("{{ column.Name }}")]
+        {{~ if column.IsNullable && column.CSharpType != "string" ~}}
+        public {{ column.CSharpType }}? {{ column.Name   }} { get; set; }
+        {{~ else ~}}
+        public {{ column.CSharpType }} {{ column.Name   }} { get; set; }
+        {{~ end ~}}
         {{~ end ~}}
 {{~ end ~}}
         internal Domain.Entities.{{ entity_name }} ToDomain()
@@ -70,8 +66,8 @@ namespace WebApi.Dtos
             {
                 Id = Id,
 {{~ for column in columns ~}}
-                {{~ if column.name != "id" and column.name != "created_at" ~}}
-                {{ column.name | string.pascalcase }} = {{ column.name | string.pascalcase }},
+                {{~ if column.Name != "id" && column.Name != "created_at" ~}}
+                {{ column.Name   }} = {{ column.Name   }},
                 {{~ end ~}}
 {{~ end ~}}
             };
