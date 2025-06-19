@@ -1,5 +1,4 @@
-﻿
-using System.Data;
+﻿using System.Data;
 using Dapper;
 using Domain.Entities;
 using Application.Repositories;
@@ -15,9 +14,9 @@ namespace Infrastructure.Repositories
     {
         private readonly IDbConnection _dbConnection;
         private IDbTransaction? _dbTransaction;
-        private IUserRepository? _userRepository;
+        private IUserRepository _userRepository;
 
-        public {{ entity_name }}Repository(IDbConnection dbConnection, IUserRepository? userRepository)
+        public {{ entity_name }}Repository(IDbConnection dbConnection, IUserRepository userRepository)
         {
             _dbConnection = dbConnection;
             _userRepository = userRepository;
@@ -28,21 +27,37 @@ namespace Infrastructure.Repositories
             _dbTransaction = dbTransaction;
         }
 
-        // --------------------
-        // Базовые CRUD-методы
-        // --------------------
-
         public async Task<List<{{ entity_name }}>> GetAll()
         {
             try
             {
-                var sql = $"SELECT * FROM \"{table_name}\"";
+                var sql = "SELECT * FROM {{ table_name }}";
                 var models = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, transaction: _dbTransaction);
                 return models.ToList();
             }
             catch (Exception ex)
             {
-                throw new RepositoryException($"Failed to get {table_name}", ex);
+                throw new RepositoryException("Failed to get {{ entity_name }}", ex);
+            }
+        }
+
+        public async Task<{{ entity_name }}> GetOneByID(int id)
+        {
+            try
+            {
+                var sql = "SELECT * FROM {{ table_name }} WHERE id = @Id LIMIT 1";
+                var model = await _dbConnection.QuerySingleOrDefaultAsync<{{ entity_name }}>(sql, new { Id = id }, transaction: _dbTransaction);
+
+                if (model == null)
+                {
+                    throw new RepositoryException($"{{ entity_name }} with ID {id} not found.", null);
+                }
+
+                return model;
+            }
+            catch (Exception ex)
+            {
+                throw new RepositoryException("Failed to get {{ entity_name }}", ex);
             }
         }
 
@@ -52,36 +67,25 @@ namespace Infrastructure.Repositories
             {
                 var userId = await UserSessionHelper.SetCurrentUserAsync(_userRepository, _dbConnection, _dbTransaction);
 
-                var model = new {{ entity_name }}Model
+                var model = new {{ entity_name }}
                 {
-                    {{~ for column in columns ~}}
-                    {{ column.name }} = domain.{{ column.name }},
-                    {{~ end ~}}
+{{~ for column in columns ~}}
+{{~ if column.Name != "id" ~}}
+                    {{ column.Name }} = domain.{{ column.Name }},
+{{~ end ~}}
+{{~ end ~}}
                 };
-
                 await FillLogDataHelper.FillLogDataCreate(model, userId);
 
-                var columnsList = columns.Select(c => $"\"{c.name}\"").ToList();
-                columnsList.AddRange(new[] { "\"created_at\"", "\"updated_at\"", "\"created_by\"", "\"updated_by\"" });
-
-                var parametersList = columns.Select(c => $"@{c.name}").ToList();
-                parametersList.AddRange(new[] { "@created_at", "@updated_at", "@created_by", "@updated_by" });
-
-                var sql = $@"
-INSERT INTO \"{table_name}\" (
-    {string.Join(", ", columnsList)}
-)
-VALUES (
-    {string.Join(", ", parametersList)}
-)
-RETURNING \"{primary_key.name}\"";
-
+                var sql = @"INSERT INTO {{ table_name }}({{~ for column in columns ~}}{{~ if column.Name != "id" ~}}{{ column.Name }}{{~ if !for.last ~}}, {{~ end ~}}{{~ end ~}}{{~ end ~}}) 
+                           VALUES ({{~ for column in columns ~}}{{~ if column.Name != "id" ~}}@{{ column.Name }}{{~ if !for.last ~}}, {{~ end ~}}{{~ end ~}}{{~ end ~}}) 
+                           RETURNING id";
                 var result = await _dbConnection.ExecuteScalarAsync<int>(sql, model, transaction: _dbTransaction);
                 return result;
             }
             catch (Exception ex)
             {
-                throw new RepositoryException($"Failed to add {table_name}", ex);
+                throw new RepositoryException("Failed to add {{ entity_name }}", ex);
             }
         }
 
@@ -91,28 +95,15 @@ RETURNING \"{primary_key.name}\"";
             {
                 var userId = await UserSessionHelper.SetCurrentUserAsync(_userRepository, _dbConnection, _dbTransaction);
 
-                var model = new {{ entity_name }}Model
+                var model = new {{ entity_name }}
                 {
-                    {{~ for column in columns ~}}
-                    {{ column.name }} = domain.{{ column.name }},
-                    {{~ end ~}}
+{{~ for column in columns ~}}
+                    {{ column.Name }} = domain.{{ column.Name }},
+{{~ end ~}}
                 };
-
                 await FillLogDataHelper.FillLogDataUpdate(model, userId);
 
-                var setClauses = new List<string>();
-                foreach (var column in columns.Where(c => !c.is_primary_key))
-                {
-                    setClauses.Add($"\"{column.name}\" = @{column.name}");
-                }
-                setClauses.Add("\"updated_at\" = @updated_at");
-                setClauses.Add("\"updated_by\" = @updated_by");
-
-                var sql = $@"
-UPDATE \"{table_name}\"
-SET {string.Join(", ", setClauses)}
-WHERE \"{primary_key.name}\" = @{primary_key.name}";
-
+                var sql = @"UPDATE {{ table_name }} SET {{~ for column in columns ~}}{{~ if column.Name != "id" ~}}{{ column.Name }} = @{{ column.Name }}{{~ if !for.last ~}}, {{~ end ~}}{{~ end ~}}{{~ end ~}} WHERE id = @id";
                 var affected = await _dbConnection.ExecuteAsync(sql, model, transaction: _dbTransaction);
                 if (affected == 0)
                 {
@@ -121,7 +112,7 @@ WHERE \"{primary_key.name}\" = @{primary_key.name}";
             }
             catch (Exception ex)
             {
-                throw new RepositoryException($"Failed to update {table_name}", ex);
+                throw new RepositoryException("Failed to update {{ entity_name }}", ex);
             }
         }
 
@@ -129,26 +120,19 @@ WHERE \"{primary_key.name}\" = @{primary_key.name}";
         {
             try
             {
-                var sql = $@"
-SELECT * 
-FROM \"{table_name}\"
-OFFSET @pageSize * (@pageNumber - 1)
-LIMIT @pageSize";
+                var sql = "SELECT * FROM {{ table_name }} OFFSET @pageSize * (@pageNumber - 1) LIMIT @pageSize";
+                var models = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, new { pageSize, pageNumber }, transaction: _dbTransaction);
 
-                var models = await _dbConnection.QueryAsync<{{ entity_name }}>(
-                    sql,
-                    new { pageSize, pageNumber },
-                    transaction: _dbTransaction
-                );
-
-                var sqlCount = $"SELECT COUNT(*) FROM \"{table_name}\"";
+                var sqlCount = "SELECT COUNT(*) FROM {{ table_name }}";
                 var totalItems = await _dbConnection.ExecuteScalarAsync<int>(sqlCount, transaction: _dbTransaction);
 
-                return new PaginatedList<{{ entity_name }}>(models.ToList(), totalItems, pageNumber, pageSize);
+                var domainItems = models.ToList();
+
+                return new PaginatedList<{{ entity_name }}>(domainItems, totalItems, pageNumber, pageSize);
             }
             catch (Exception ex)
             {
-                throw new RepositoryException($"Failed to get {table_name} list", ex);
+                throw new RepositoryException("Failed to get {{ entity_name }}", ex);
             }
         }
 
@@ -156,61 +140,34 @@ LIMIT @pageSize";
         {
             try
             {
-                var sql = $@"
-DELETE FROM \"{table_name}\"
-WHERE \"{primary_key.name}\" = @id";
-                var affected = await _dbConnection.ExecuteAsync(sql, new { id }, transaction: _dbTransaction);
+                var sql = "DELETE FROM {{ table_name }} WHERE id = @Id";
+                var affected = await _dbConnection.ExecuteAsync(sql, new { Id = id }, transaction: _dbTransaction);
+
                 if (affected == 0)
                 {
-                    throw new RepositoryException("Not found", null);
+                    throw new RepositoryException("{{ entity_name }} not found", null);
                 }
             }
             catch (Exception ex)
             {
-                throw new RepositoryException($"Failed to delete {table_name}", ex);
+                throw new RepositoryException("Failed to delete {{ entity_name }}", ex);
             }
         }
+{{~ for fk in foreign_keys ~}}
 
-        public async Task<{{ entity_name }}?> GetOne(int id)
+        public async Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | to_pascal_case | string.replace "_id" "" }}({{ fk.csharp_type }} {{ fk.column_name }})
         {
             try
             {
-                var sql = $@"
-SELECT *
-FROM \"{table_name}\"
-WHERE \"{primary_key.name}\" = @id
-LIMIT 1";
-
-                var model = await _dbConnection.QueryFirstOrDefaultAsync<{{ entity_name }}>(sql, new { id }, transaction: _dbTransaction);
-                return model;
+                var sql = "SELECT * FROM {{ table_name }} WHERE {{ fk.column_name }} = @{{ fk.column_name }}";
+                var models = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, new { {{ fk.column_name }} }, transaction: _dbTransaction);
+                return models.ToList();
             }
             catch (Exception ex)
             {
-                throw new RepositoryException($"Failed to get single {table_name}", ex);
+                throw new RepositoryException("Failed to get {{ entity_name }} by {{ fk.column_name }}", ex);
             }
         }
-
-        // -----------------------------------------
-        // Методы для внешних ключей (FK)
-        // -----------------------------------------
-        {{- for fk in foreign_keys }}
-        public async Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | to_pascal_case }}({{ fk.csharp_type }} {{ fk.column_name }})
-        {
-            try
-            {
-                var sql = $@"
-SELECT t.*
-FROM "{{ table_name }}" t
-WHERE t."{{ fk.column_name }}" = @{{ fk.column_name }}";
-
-                var rows = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, new { {{ fk.column_name }} }, transaction: _dbTransaction);
-                return rows.ToList();
-            }
-            catch (Exception ex)
-            {
-                throw new RepositoryException($"Failed to get {{ table_name }} by {{ fk.column_name }}", ex);
-            }
-        }
-        {{- end }}
+{{~ end ~}}
     }
 }

@@ -1,22 +1,18 @@
-﻿
-using Application.Models;
+﻿using Application.Models;
 using Domain.Entities;
 
 namespace Application.Repositories
 {
     public interface I{{ entity_name }}Repository : BaseRepository
     {
-        // Базовые CRUD
         Task<List<{{ entity_name }}>> GetAll();
+        Task<{{ entity_name }}> GetOneByID(int id);
         Task<PaginatedList<{{ entity_name }}>> GetPaginated(int pageSize, int pageNumber);
         Task<int> Add({{ entity_name }} domain);
         Task Update({{ entity_name }} domain);
-        Task<{{ entity_name }}> GetOne(int id);
         Task Delete(int id);
-
-        // Методы для FK
-        {{- for fk in foreign_keys }}
-        Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | to_pascal_case }}({{ fk.csharp_type }} {{ fk.column_name }});
-        {{- end }}
+{{~ for fk in foreign_keys ~}}
+        Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | to_pascal_case | string.replace "_id" "" }}({{ fk.csharp_type }} {{ fk.column_name }});
+{{~ end ~}}
     }
 }

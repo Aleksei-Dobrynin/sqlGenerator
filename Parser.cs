@@ -24,24 +24,14 @@ namespace SQLFileGenerator
             var tables = new List<TableSchema>();
 
             // Регулярное выражение для поиска CREATE TABLE блоков
-            var tableRegex = new Regex(@"CREATE\s+TABLE\s+(\w+)\s*\(([^;]+)\);", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            var tableRegex = new Regex(@"CREATE\s+TABLE\s+(\w+)\s*\((.+?)\);", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
-            // Регулярное выражение для анализа столбцов внутри CREATE TABLE
-            var columnRegex = new Regex(@"(\w+)\s+([\w()]+)(\s+NOT\s+NULL)?(\s+PRIMARY\s+KEY)?(\s+REFERENCES\s+(\w+)\s*\((\w+)\))?.*?(?:,|$)",
-                                        RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-            // Регулярное выражение для анализа отдельных ALTER TABLE команд для ограничений внешнего ключа
+            // Регулярное выражение для ALTER TABLE FK
             var alterTableFkRegex = new Regex(@"ALTER\s+TABLE\s+(\w+)\s+ADD\s+CONSTRAINT\s+(\w+)\s+FOREIGN\s+KEY\s+\((\w+)\)\s+REFERENCES\s+(\w+)(?:\s*\((\w+)\))?;",
                                            RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
-            // Регулярное выражение для поиска ограничений PRIMARY KEY внутри CREATE TABLE
-            var pkConstraintRegex = new Regex(@"CONSTRAINT\s+(\w+)\s+PRIMARY\s+KEY\s*\((\w+)\)",
-                                           RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-            // Словарь для хранения схем таблиц по имени для последующего обновления
             var tableDict = new Dictionary<string, TableSchema>(StringComparer.OrdinalIgnoreCase);
 
-            // Поиск всех CREATE TABLE блоков
             var matches = tableRegex.Matches(sqlScript);
 
             foreach (Match match in matches)
@@ -49,77 +39,132 @@ namespace SQLFileGenerator
                 var tableName = match.Groups[1].Value;
                 var columnsDefinition = match.Groups[2].Value;
 
+                Console.WriteLine($"Parsing table: {tableName}"); // Debug
+
                 var tableSchema = new TableSchema
                 {
                     TableName = tableName,
                     EntityName = ToPascalCase(tableName)
                 };
 
-                // Поиск ограничения PRIMARY KEY внутри CREATE TABLE
-                var pkConstraintMatches = pkConstraintRegex.Matches(columnsDefinition);
-                foreach (Match pkMatch in pkConstraintMatches)
-                {
-                    var pkColumnName = pkMatch.Groups[2].Value;
-                    // Отмечаем, что эта колонка будет первичным ключом
-                    // (Колонка будет создана позже в основном проходе)
-                    foreach (var column in tableSchema.Columns)
-                    {
-                        if (column.Name.Equals(pkColumnName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            column.IsPrimaryKey = true;
-                            break;
-                        }
-                    }
-                }
-
-                // Анализ определений столбцов
-                var columnMatches = columnRegex.Matches(columnsDefinition);
-                foreach (Match columnMatch in columnMatches)
-                {
-                    var columnName = columnMatch.Groups[1].Value;
-
-                    // Пропускаем строки, которые начинаются с CONSTRAINT
-                    if (columnName.Equals("CONSTRAINT", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var dataType = columnMatch.Groups[2].Value;
-                    var isNullable = !columnMatch.Groups[3].Success;
-                    var isPrimaryKey = columnMatch.Groups[4].Success;
-                    var isForeignKey = columnMatch.Groups[5].Success;
-
-                    var csharpType = MapPostgresToCSharpType(dataType);
-
-                    var column = new ColumnSchema
-                    {
-                        Name = columnName,
-                        CSharpType = csharpType,
-                        IsPrimaryKey = isPrimaryKey,
-                        IsForeignKey = isForeignKey,
-                        IsNullable = isNullable
-                    };
-
-                    tableSchema.Columns.Add(column);
-
-                    if (isForeignKey)
-                    {
-                        var referencedTable = columnMatch.Groups[6].Value;
-                        var referencedColumn = columnMatch.Groups[7].Value;
-
-                        tableSchema.ForeignKeys.Add(new ForeignKeyInfo
-                        {
-                            ColumnName = columnName,
-                            CSharpType = csharpType,
-                            ReferencesTable = referencedTable,
-                            ReferencesColumn = referencedColumn
-                        });
-                    }
-                }
+                // Парсим столбцы более надежным способом
+                ParseColumns(columnsDefinition, tableSchema);
 
                 tables.Add(tableSchema);
                 tableDict[tableName] = tableSchema;
+
+                Console.WriteLine($"Parsed {tableSchema.Columns.Count} columns for {tableName}"); // Debug
             }
 
-            // Обработка ALTER TABLE команд для внешних ключей
+            // Обрабатываем ALTER TABLE для FK
+            ProcessAlterTableForeignKeys(sqlScript, tableDict, alterTableFkRegex);
+
+            return tables;
+        }
+
+        private static void ParseColumns(string columnsDefinition, TableSchema tableSchema)
+        {
+            // Нормализуем текст - убираем лишние пробелы и переносы
+            var normalizedText = Regex.Replace(columnsDefinition, @"\s+", " ").Trim();
+
+            // Разбиваем по запятым, учитывая скобки
+            var columnParts = SplitColumnsDefinition(normalizedText);
+
+            foreach (var columnPart in columnParts)
+            {
+                var trimmedPart = columnPart.Trim();
+
+                // Пропускаем CONSTRAINT определения
+                if (trimmedPart.StartsWith("CONSTRAINT", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var column = ParseSingleColumn(trimmedPart);
+                if (column != null)
+                {
+                    tableSchema.Columns.Add(column);
+                    Console.WriteLine($"  Parsed column: {column.Name} ({column.CSharpType})"); // Debug
+                }
+            }
+        }
+
+        private static List<string> SplitColumnsDefinition(string definition)
+        {
+            var parts = new List<string>();
+            var currentPart = new StringBuilder();
+            var parenthesesLevel = 0;
+            var inQuotes = false;
+            var quoteChar = '\0';
+
+            for (int i = 0; i < definition.Length; i++)
+            {
+                var ch = definition[i];
+
+                if ((ch == '\'' || ch == '"') && !inQuotes)
+                {
+                    inQuotes = true;
+                    quoteChar = ch;
+                }
+                else if (ch == quoteChar && inQuotes)
+                {
+                    inQuotes = false;
+                    quoteChar = '\0';
+                }
+                else if (!inQuotes)
+                {
+                    if (ch == '(') parenthesesLevel++;
+                    else if (ch == ')') parenthesesLevel--;
+                    else if (ch == ',' && parenthesesLevel == 0)
+                    {
+                        parts.Add(currentPart.ToString().Trim());
+                        currentPart.Clear();
+                        continue;
+                    }
+                }
+
+                currentPart.Append(ch);
+            }
+
+            if (currentPart.Length > 0)
+            {
+                parts.Add(currentPart.ToString().Trim());
+            }
+
+            return parts;
+        }
+
+        private static ColumnSchema? ParseSingleColumn(string columnDefinition)
+        {
+            // Удаляем лишние пробелы
+            var parts = Regex.Split(columnDefinition.Trim(), @"\s+");
+
+            if (parts.Length < 2) return null;
+
+            var columnName = parts[0].Trim('"');
+            var dataType = parts[1];
+
+            // Проверяем атрибуты
+            var upperDefinition = columnDefinition.ToUpper();
+            var isNullable = !upperDefinition.Contains("NOT NULL");
+            var isPrimaryKey = upperDefinition.Contains("PRIMARY KEY");
+
+            // Обрабатываем REFERENCES
+            var referencesMatch = Regex.Match(columnDefinition, @"REFERENCES\s+(\w+)(?:\s*\((\w+)\))?", RegexOptions.IgnoreCase);
+            var isForeignKey = referencesMatch.Success;
+
+            var csharpType = MapPostgresToCSharpType(dataType);
+
+            return new ColumnSchema
+            {
+                Name = columnName,
+                CSharpType = csharpType,
+                IsPrimaryKey = isPrimaryKey,
+                IsForeignKey = isForeignKey,
+                IsNullable = isNullable
+            };
+        }
+
+        private static void ProcessAlterTableForeignKeys(string sqlScript, Dictionary<string, TableSchema> tableDict, Regex alterTableFkRegex)
+        {
             var alterTableMatches = alterTableFkRegex.Matches(sqlScript);
             foreach (Match alterMatch in alterTableMatches)
             {
@@ -127,12 +172,10 @@ namespace SQLFileGenerator
                 var constraintName = alterMatch.Groups[2].Value;
                 var columnName = alterMatch.Groups[3].Value;
                 var referencedTable = alterMatch.Groups[4].Value;
-                var referencedColumn = alterMatch.Groups[5].Success ? alterMatch.Groups[5].Value : "id"; // Если не указан, обычно это id
+                var referencedColumn = alterMatch.Groups[5].Success ? alterMatch.Groups[5].Value : "id";
 
-                // Находим соответствующую таблицу
                 if (tableDict.TryGetValue(tableName, out var tableSchema))
                 {
-                    // Находим соответствующую колонку
                     var column = tableSchema.Columns.FirstOrDefault(c =>
                         c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
 
@@ -140,7 +183,6 @@ namespace SQLFileGenerator
                     {
                         column.IsForeignKey = true;
 
-                        // Проверяем, существует ли уже такой внешний ключ
                         var existingFk = tableSchema.ForeignKeys.FirstOrDefault(fk =>
                             fk.ColumnName.Equals(columnName, StringComparison.OrdinalIgnoreCase));
 
@@ -158,10 +200,7 @@ namespace SQLFileGenerator
                     }
                 }
             }
-
-            return tables;
         }
-
         /// <summary>
         /// Преобразует тип данных PostgreSQL в соответствующий тип C#.
         /// </summary>

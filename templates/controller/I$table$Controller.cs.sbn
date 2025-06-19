@@ -1,0 +1,80 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using WebApi.Dtos;
+using Application.UseCases;
+
+namespace WebApi.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class {{ entity_name }}Controller : ControllerBase
+    {
+        private readonly {{ entity_name }}UseCases _{{ entity_name | to_camel_case }}UseCases;
+
+        public {{ entity_name }}Controller({{ entity_name }}UseCases {{ entity_name | to_camel_case }}UseCases)
+        {
+            _{{ entity_name | to_camel_case }}UseCases = {{ entity_name | to_camel_case }}UseCases;
+        }
+
+        [HttpGet]
+        [Route("GetAll")]
+        public async Task<IActionResult> Get()
+        {
+            var response = await _{{ entity_name | to_camel_case }}UseCases.GetAll();
+            return Ok(response);
+        }
+
+        [HttpGet]
+        [Route("GetOneById")]
+        public async Task<IActionResult> GetOneById(int id)
+        {
+            var response = await _{{ entity_name | to_camel_case }}UseCases.GetOneByID(id);
+            return Ok(response);
+        }
+
+        [HttpGet]
+        [Route("GetPaginated")]
+        public async Task<IActionResult> GetPaginated(int pageSize, int pageNumber)
+        {
+            var response = await _{{ entity_name | to_camel_case }}UseCases.GetPagniated(pageSize, pageNumber);
+            return Ok(response);
+        }
+
+        [HttpPost]
+        [Route("Create")]
+        public async Task<IActionResult> Create(Create{{ entity_name }}Request requestDto)
+        {
+            var request = new Domain.Entities.{{ entity_name }}
+            {
+{{~ for column in columns ~}}
+{{~ if column.Name != "id" ~}}
+                {{ column.Name }} = requestDto.{{ column.Name }},
+{{~ end ~}}
+{{~ end ~}}
+            };
+            var response = await _{{ entity_name | to_camel_case }}UseCases.Create(request);
+            return Ok(response);
+        }
+
+        [HttpPut]
+        [Route("Update")]
+        public async Task<IActionResult> Update(Update{{ entity_name }}Request requestDto)
+        {
+            var request = new Domain.Entities.{{ entity_name }}
+            {
+{{~ for column in columns ~}}
+                {{ column.Name }} = requestDto.{{ column.Name }},
+{{~ end ~}}
+            };
+            var response = await _{{ entity_name | to_camel_case }}UseCases.Update(request);
+            return Ok(response);
+        }
+
+        [HttpDelete]
+        [Route("Delete")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await _{{ entity_name | to_camel_case }}UseCases.Delete(id);
+            return Ok();
+        }
+    }
+}

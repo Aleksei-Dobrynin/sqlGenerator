@@ -1,23 +1,27 @@
-namespace Domain.Entities;
-
-public class {{ entity_name }} : BaseLogDomain
+{{~ 
+# Определяем есть ли audit поля
+has_audit_fields = false
+for column in columns
+  if column.Name == "created_at" || column.Name == "updated_at" || column.Name == "created_by" || column.Name == "updated_by"
+    has_audit_fields = true
+    break
+  end
+end
+~}}
+namespace Domain.Entities
 {
-{{~ for column in columns ~}}
-    {{~ if column.IsNullable && column.CSharpType != "string" ~}}
-    public {{ column.CSharpType }}? {{ column.Name | to_pascal_case }} { get; set; }
-    {{~ else ~}}
-    public {{ column.CSharpType }} {{ column.Name | to_pascal_case }} { get; set; }
-    {{~ end ~}}
+{{~ if has_audit_fields ~}}
+    public class {{ entity_name }} : BaseLogDomain
+{{~ else ~}}
+    public class {{ entity_name }}
 {{~ end ~}}
-}
-
-public class {{ entity_name }}Model : BaseLogDomain
-{
+    {
 {{~ for column in columns ~}}
-    {{~ if column.IsNullable && column.CSharpType != "string" ~}}
-    public {{ column.CSharpType }}? {{ column.Name | to_pascal_case }} { get; set; }
-    {{~ else ~}}
-    public {{ column.CSharpType }} {{ column.Name | to_pascal_case }} { get; set; }
-    {{~ end ~}}
+        {{~ if column.IsNullable && !column.IsPrimaryKey && column.CSharpType != "string" ~}}
+        public {{ column.CSharpType }}? {{ column.Name }} { get; set; }
+        {{~ else ~}}
+        public {{ column.CSharpType }} {{ column.Name }} { get; set; }
+        {{~ end ~}}
 {{~ end ~}}
+    }
 }

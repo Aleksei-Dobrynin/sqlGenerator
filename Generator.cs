@@ -168,8 +168,28 @@ namespace SQLFileGenerator
                 var scriptObject = new ScriptObject();
                 scriptObject["entity_name"] = table.EntityName;
                 scriptObject["table_name"] = table.TableName;
-                scriptObject["columns"] = table.Columns;
-                scriptObject["foreign_keys"] = table.ForeignKeys;
+                scriptObject["columns"] = table.Columns.Select(c => new Dictionary<string, object>
+                {
+                    ["Name"] = c.Name,
+                    ["CSharpType"] = c.CSharpType,
+                    ["IsPrimaryKey"] = c.IsPrimaryKey,
+                    ["IsForeignKey"] = c.IsForeignKey,
+                    ["IsNullable"] = c.IsNullable
+                }).ToArray();
+                //Проверка колонок
+                Console.WriteLine($"Debug: Table {table.EntityName} has {table.Columns.Count} columns");
+                foreach (var col in table.Columns)
+                {
+                    Console.WriteLine($"  Column: {col.Name} - {col.CSharpType}");
+                }
+
+                scriptObject["foreign_keys"] = table.ForeignKeys.Select(fk => new Dictionary<string, object>
+                {
+                    ["column_name"] = fk.ColumnName,
+                    ["csharp_type"] = fk.CSharpType,
+                    ["references_table"] = fk.ReferencesTable,
+                    ["references_column"] = fk.ReferencesColumn
+                }).ToArray();
                 scriptObject["primary_key"] = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
                 scriptObject.Import("map_type", new Func<string, string>(MapType));
 
