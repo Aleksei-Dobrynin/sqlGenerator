@@ -30,25 +30,43 @@
     <None Update="sql\script.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="templates\controller\I$table$Controller.cs.sbn">
+    <None Update="templates\$table$\controller\$table$Controller.cs.sbn">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="templates\dto\%24table%24dto.cs.sbn">
+    <None Update="templates\$table$\dto\$table$dto.cs.sbn">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="templates\entity\%24table%24.cs.sbn">
+    <None Update="templates\$table$\entity\$table$.cs.sbn">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="templates\irepo\I%24table%24Repository.cs.sbn">
+    <None Update="templates\$table$\irepo\I$table$Repository.cs.sbn">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="templates\repo\%24table%24Repository.cs.sbn">
+    <None Update="templates\$table$\repo\$table$Repository.cs.sbn">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="templates\%24table%24\%24table%24AddEditView\base.tsx.sbn">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="templates\%24table%24\%24table%24AddEditView\index.tsx.sbn">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="templates\%24table%24\%24table%24AddEditView\mtmTabs.tsx.sbn">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="templates\%24table%24\%24table%24AddEditView\popupForm.tsx.sbn">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="templates\%24table%24\%24table%24AddEditView\store.tsx.sbn">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="templates\%24table%24\%24table%24AddEditView\valid.tsx.sbn">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="templates\test\test.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="templates\usecase\%24table%24UseCase.cs.sbn">
+    <None Update="templates\$table$\usecase\$table$UseCase.cs.sbn">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="templates\view\base.tsx.sbn">

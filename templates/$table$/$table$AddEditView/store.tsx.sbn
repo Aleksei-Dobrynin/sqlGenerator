@@ -1,0 +1,213 @@
+﻿import { makeAutoObservable, runInAction } from "mobx";
+import i18n from "i18next";
+import dayjs from "dayjs";
+import MainStore from "MainStore";
+import { validate, validateField } from "./valid";
+import { get{{ entity_name | to_snake_case }} } from "api/{{ entity_name | to_snake_case }}";
+import { create{{ entity_name | to_snake_case }} } from "api/{{ entity_name | to_snake_case }}";
+import { update{{ entity_name | to_snake_case }} } from "api/{{ entity_name | to_snake_case }}";
+
+// Import for parent list store (if this is a child form)
+{{~ for fk in foreign_keys ~}}
+{{~ if fk.column_name == (table_name | to_snake_case) + "_id" ~}}
+import storeList from "../{{ entity_name | to_snake_case }}ListView/store";
+{{~ end ~}}
+{{~ end ~}}
+
+// Import dictionaries for foreign keys
+{{~ for fk in foreign_keys ~}}
+{{~ if fk.column_name != (table_name | to_snake_case) + "_id" ~}}
+import { get{{ fk.references_table | to_snake_case }}s } from "api/{{ fk.references_table | to_snake_case }}";
+{{~ end ~}}
+{{~ end ~}}
+
+class NewStore {
+  // Entity fields
+  id = 0;
+{{~ for column in columns ~}}
+{{~ if column.name != "id" && column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
+{{~ if column.csharp_type == "bool" ~}}
+  {{ column.name }} = false;
+{{~ else if column.csharp_type == "int" || column.csharp_type == "long" ~}}
+  {{ column.name }} = 0;
+{{~ else if column.csharp_type == "DateTime" ~}}
+  {{ column.name }} = null;
+{{~ else ~}}
+  {{ column.name }} = "";
+{{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}
+
+  // Validation errors
+  errors: { [key: string]: string } = {};
+
+  // Dictionaries for foreign keys
+{{~ for fk in foreign_keys ~}}
+{{~ if fk.column_name != (table_name | to_snake_case) + "_id" ~}}
+  {{ fk.column_name | string.replace "_id" "" | to_snake_case }}_list = [];
+{{~ end ~}}
+{{~ end ~}}
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  clearStore() {
+    runInAction(() => {
+      this.id = 0;
+{{~ for column in columns ~}}
+{{~ if column.name != "id" && column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
+{{~ if column.csharp_type == "bool" ~}}
+      this.{{ column.name }} = false;
+{{~ else if column.csharp_type == "int" || column.csharp_type == "long" ~}}
+      this.{{ column.name }} = 0;
+{{~ else if column.csharp_type == "DateTime" ~}}
+      this.{{ column.name }} = null;
+{{~ else ~}}
+      this.{{ column.name }} = "";
+{{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}
+      this.errors = {};
+    });
+  }
+
+  handleChange(event) {
+    const { name, value, type, checked } = event.target;
+    if (type === 'checkbox') {
+      (this as any)[name] = checked;
+    } else {
+      (this as any)[name] = value;
+    }
+    this.validateField(name, value);
+  }
+
+  async validateField(name: string, value: any) {
+    const { isValid, error } = await validateField(name, value);
+    if (isValid) {
+      this.errors[name] = "";
+    } else {
+      this.errors[name] = error;
+    }
+  }
+
+  async onSaveClick(onSaved: (id: number) => void) {
+    var data = {
+      id: this.id,
+{{~ for column in columns ~}}
+{{~ if column.name != "id" && column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
+{{~ if column.csharp_type == "int" || column.csharp_type == "long" ~}}
+      {{ column.name }}: this.{{ column.name }} - 0,
+{{~ else if column.csharp_type == "DateTime" ~}}
+      {{ column.name }}: this.{{ column.name }} ? dayjs(this.{{ column.name }}).format() : null,
+{{~ else ~}}
+      {{ column.name }}: this.{{ column.name }},
+{{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}
+    };
+
+{{~ for fk in foreign_keys ~}}
+{{~ if fk.column_name == (table_name | to_snake_case) + "_id" ~}}
+    // If this is a child form, get parent ID from list store
+    if (typeof storeList !== 'undefined' && storeList.idMain) {
+      data.{{ fk.column_name }} = storeList.idMain;
+    }
+{{~ end ~}}
+{{~ end ~}}
+
+    const { isValid, errors } = await validate(data);
+    if (!isValid) {
+      this.errors = errors;
+      MainStore.openErrorDialog(i18n.t("message:error.alertMessageAlert"));
+      return;
+    }
+
+    try {
+      MainStore.changeLoader(true);
+      let response;
+      if (this.id === 0) {
+        response = await create{{ entity_name | to_snake_case }}(data);
+      } else {
+        response = await update{{ entity_name | to_snake_case }}(data);
+      }
+      if (response.status === 201 || response.status === 200) {
+        onSaved(response.data.id);
+        if (data.id === 0) {
+          MainStore.setSnackbar(i18n.t("message:snackbar.successSave"), "success");
+        } else {
+          MainStore.setSnackbar(i18n.t("message:snackbar.successEdit"), "success");
+        }
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      MainStore.setSnackbar(i18n.t("message:somethingWentWrong"), "error");
+    } finally {
+      MainStore.changeLoader(false);
+    }
+  }
+
+  async doLoad(id: number) {
+    // Load dictionaries
+{{~ for fk in foreign_keys ~}}
+{{~ if fk.column_name != (table_name | to_snake_case) + "_id" ~}}
+    await this.load{{ fk.references_table | to_pascal_case }}List();
+{{~ end ~}}
+{{~ end ~}}
+
+    this.id = id;
+
+    if (id === null || id === 0) {
+      return;
+    }
+
+    this.load{{ entity_name }}(id);
+  }
+
+{{~ for fk in foreign_keys ~}}
+{{~ if fk.column_name != (table_name | to_snake_case) + "_id" ~}}
+  load{{ fk.references_table | to_pascal_case }}List = async () => {
+    try {
+      MainStore.changeLoader(true);
+      const response = await get{{ fk.references_table | to_snake_case }}s();
+      if ((response.status === 201 || response.status === 200) && response?.data !== null) {
+        runInAction(() => {
+          this.{{ fk.column_name | string.replace "_id" "" | to_snake_case }}_list = response.data;
+        });
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      MainStore.setSnackbar(i18n.t("message:somethingWentWrong"), "error");
+    } finally {
+      MainStore.changeLoader(false);
+    }
+  };
+{{~ end ~}}
+{{~ end ~}}
+
+  load{{ entity_name }} = async (id: number) => {
+    try {
+      MainStore.changeLoader(true);
+      const response = await get{{ entity_name | to_snake_case }}(id);
+      if ((response.status === 201 || response.status === 200) && response?.data !== null) {
+        runInAction(() => {
+{{~ for column in columns ~}}
+{{~ if column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
+          this.{{ column.name }} = response.data.{{ column.name }};
+{{~ end ~}}
+{{~ end ~}}
+        });
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      MainStore.setSnackbar(i18n.t("message:somethingWentWrong"), "error");
+    } finally {
+      MainStore.changeLoader(false);
+    }
+  };
+}
+
+export default new NewStore();

@@ -1,67 +1,61 @@
-create table org_structure
+create table employee
+(
+    id          serial
+        primary key,
+    last_name   text,
+    first_name  text,
+    second_name text,
+    pin         text,
+    remote_id   text,
+    user_id     text,
+    created_at  timestamp,
+    updated_at  timestamp,
+    created_by  integer,
+    updated_by  integer,
+    telegram    text,
+    email       text,
+    guid        text
+);
+
+alter table employee
+    owner to postgres;
+
+create table employee_contact
+(
+    id                 serial
+        primary key,
+    value              text,
+    employee_id        integer,
+    allow_notification boolean,
+    type_id            integer,
+    created_at         timestamp,
+    created_by         integer,
+    updated_at         timestamp,
+    updated_by         integer
+);
+
+alter table employee_contact
+    owner to postgres;
+
+
+create table employee_in_structure
 (
     id           serial
         primary key,
-    parent_id    integer,
-    unique_id    text,
-    name         text,
-    version      text,
-    is_active    boolean,
-    date_start   timestamp,
+    employee_id  integer   not null
+        references employee,
+    date_start   timestamp not null,
     date_end     timestamp,
-    remote_id    text,
     created_at   timestamp,
     updated_at   timestamp,
     created_by   integer,
     updated_by   integer,
-    short_name   text,
-    code         varchar,
-    order_number integer
-);
-
-alter table org_structure
-    owner to postgres;
-
-create table workflow
-(
-    name       text,
-    is_active  boolean,
-    date_start timestamp,
-    date_end   timestamp,
-    created_at timestamp,
-    updated_at timestamp,
-    created_by integer,
-    updated_by integer,
-    id         serial
-        primary key,
-    name_kg    text
-);
-
-alter table workflow
-    owner to postgres;
-
-create table workflow_task_template
-(
-    id           integer default nextval('workflow_task_template_id_seq'::regclass) not null
-        constraint "XPKШаблон_задачи_Workflow"
-            primary key,
-    workflow_id  integer
-        constraint r_1729
-            references workflow,
-    name         text,
-    "order"      integer,
-    is_active    boolean,
-    is_required  boolean,
-    description  text,
-    created_at   timestamp,
-    updated_at   timestamp,
-    created_by   integer,
-    updated_by   integer,
-    structure_id integer,
-    type_id      integer,
+    structure_id integer   not null
+        references org_structure,
+    post_id      integer,
+    is_temporary boolean,
     district_id  integer
 );
 
-alter table workflow_task_template
+alter table employee_in_structure
     owner to postgres;
-

@@ -70,7 +70,7 @@ namespace SQLFileGenerator
         }
     }
 
-    //TODO настроить папку templates чтобы ноа не все не учавстовавал в build action и не обрабатывалась дебагером и прернасилась в output папку 
+    //TODO настроить папку templates чтобы она не участвовала в build action и не обрабатывалась дебагером и переносилась в output папку 
     /// <summary>
     /// Класс для генерации файлов на основе шаблонов Scriban.
     /// Позволяет создавать множество файлов для каждой таблицы из базы данных,
@@ -107,11 +107,12 @@ namespace SQLFileGenerator
                 _ => "object" // По умолчанию
             };
         }
-        
+
         /// <summary>
         /// Обрабатывает директорию с шаблонами для конкретной таблицы.
         /// Сканирует все файлы в директории, применяет к ним шаблонизацию
         /// и сохраняет результаты в указанную директорию.
+        /// Поддерживает плейсхолдер $table$ как в именах файлов, так и в именах директорий.
         /// </summary>
         /// <param name="templatesDir">Путь к директории с шаблонами</param>
         /// <param name="resultDir">Путь к директории для сохранения результатов</param>
@@ -129,38 +130,59 @@ namespace SQLFileGenerator
                 // Получаем директорию шаблона
                 var directory = Path.GetDirectoryName(relativePath);
 
+                // Заменяем плейсхолдер $table$ в пути директории на имя сущности
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    directory = directory.Replace("$table$", table.EntityName);
+                }
+
                 // Формируем имя выходного файла
                 string fileName = Path.GetFileName(relativePath);
-                if (fileName.EndsWith(".sbn"))
+
+                // Проверяем, является ли файл шаблоном Scriban
+                bool isTemplate = fileName.EndsWith(".sbn");
+
+                if (isTemplate)
                 {
                     // Удаляем расширение .sbn
                     fileName = fileName.Substring(0, fileName.Length - 4);
-
-                    // Заменяем плейсхолдер $table$ на имя сущности
-                    fileName = fileName.Replace("$table$", table.EntityName);
                 }
 
+                // Заменяем плейсхолдер $table$ на имя сущности в имени файла
+                fileName = fileName.Replace("$table$", table.EntityName);
+
                 // Составляем полный путь к результату
-                string resultPath = directory != null
+                string resultPath = !string.IsNullOrEmpty(directory)
                     ? Path.Combine(resultDir, directory, fileName)
                     : Path.Combine(resultDir, fileName);
 
                 // Создание папки, если ее нет
                 var resultDirectory = Path.GetDirectoryName(resultPath);
-                Directory.CreateDirectory(resultDirectory);
+                if (!string.IsNullOrEmpty(resultDirectory))
+                {
+                    Directory.CreateDirectory(resultDirectory);
+                }
+
+                // Если это не шаблон .sbn, просто копируем файл
+                if (!isTemplate)
+                {
+                    File.Copy(templateFile, resultPath, overwrite: true);
+                    Console.WriteLine($"Copied {resultPath}");
+                    continue;
+                }
 
                 // Читаем содержимое шаблона
                 var templateContent = File.ReadAllText(templateFile);
                 var template = Template.Parse(templateContent);
+
                 if (template.HasErrors)
                 {
-                    Console.WriteLine(templateFile);
+                    Console.WriteLine($"Error in template: {templateFile}");
                     Console.WriteLine("Template Errors:");
                     foreach (var message in template.Messages)
                     {
-                        Console.WriteLine(message);
+                        Console.WriteLine($"  - {message}");
                     }
-                    //throw new InvalidOperationException("Template has errors.");
                     continue;
                 }
 
@@ -176,12 +198,9 @@ namespace SQLFileGenerator
                     ["IsForeignKey"] = c.IsForeignKey,
                     ["IsNullable"] = c.IsNullable
                 }).ToArray();
-                //Проверка колонок
-                Console.WriteLine($"Debug: Table {table.EntityName} has {table.Columns.Count} columns");
-                foreach (var col in table.Columns)
-                {
-                    Console.WriteLine($"  Column: {col.Name} - {col.CSharpType}");
-                }
+
+                // Отладочный вывод
+                Console.WriteLine($"Processing: Table {table.EntityName} with {table.Columns.Count} columns");
 
                 scriptObject["foreign_keys"] = table.ForeignKeys.Select(fk => new Dictionary<string, object>
                 {
@@ -190,22 +209,42 @@ namespace SQLFileGenerator
                     ["references_table"] = fk.ReferencesTable,
                     ["references_column"] = fk.ReferencesColumn
                 }).ToArray();
-                scriptObject["primary_key"] = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
-                scriptObject.Import("map_type", new Func<string, string>(MapType));
 
-                // Добавляем функцию для преобразования в PascalCase
+                // Добавляем информацию о первичном ключе
+                var primaryKeyColumn = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
+                if (primaryKeyColumn != null)
+                {
+                    scriptObject["primary_key"] = new Dictionary<string, object>
+                    {
+                        ["Name"] = primaryKeyColumn.Name,
+                        ["CSharpType"] = primaryKeyColumn.CSharpType
+                    };
+                }
+                else
+                {
+                    scriptObject["primary_key"] = null;
+                }
+
+                // Импортируем вспомогательные функции
+                scriptObject.Import("map_type", new Func<string, string>(MapType));
                 scriptObject.Import("to_pascal_case", new Func<string, string>(StringExtensions.ToPascalCase));
                 scriptObject.Import("to_camel_case", new Func<string, string>(StringExtensions.ToCamelCase));
                 scriptObject.Import("to_snake_case", new Func<string, string>(StringExtensions.ToSnakeCase));
 
-
                 var context = new TemplateContext();
                 context.PushGlobal(scriptObject);
 
-                // Генерируем код
-                var renderedTemplate = template.Render(context);
-                File.WriteAllText(resultPath, renderedTemplate);
-                Console.WriteLine($"Generated {resultPath}");
+                try
+                {
+                    // Генерируем код
+                    var renderedTemplate = template.Render(context);
+                    File.WriteAllText(resultPath, renderedTemplate);
+                    Console.WriteLine($"Generated: {resultPath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error rendering template {templateFile}: {ex.Message}");
+                }
             }
         }
     }

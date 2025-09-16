@@ -1,0 +1,70 @@
+﻿import * as yup from "yup";
+import i18n from "../../../i18n";
+
+export const schema = yup.object().shape({
+{{~ for column in columns ~}}
+{{~ if column.name != "id" && column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
+{{~ if column.is_nullable == false ~}}
+{{~ if column.csharp_type == "string" ~}}
+  {{ column.name }}: yup.string()
+    .required(() => i18n.t("message:error.fieldRequired"))
+    .min(1, () => i18n.t("message:error.fieldRequired")),
+{{~ else if column.csharp_type == "int" || column.csharp_type == "long" ~}}
+{{~ if column.is_foreign_key ~}}
+  {{ column.name }}: yup.number()
+    .notOneOf([0], () => i18n.t("message:error.fieldRequired"))
+    .required(() => i18n.t("message:error.fieldRequired")),
+{{~ else ~}}
+  {{ column.name }}: yup.number()
+    .required(() => i18n.t("message:error.fieldRequired")),
+{{~ end ~}}
+{{~ else if column.csharp_type == "bool" ~}}
+  {{ column.name }}: yup.boolean().default(false),
+{{~ else if column.csharp_type == "DateTime" ~}}
+  {{ column.name }}: yup.date()
+    .required(() => i18n.t("message:error.fieldRequired")),
+{{~ else ~}}
+  {{ column.name }}: yup.mixed()
+    .required(() => i18n.t("message:error.fieldRequired")),
+{{~ end ~}}
+{{~ else ~}}
+{{~ if column.csharp_type == "string" ~}}
+  {{ column.name }}: yup.string().nullable(),
+{{~ else if column.csharp_type == "int" || column.csharp_type == "long" ~}}
+  {{ column.name }}: yup.number().nullable(),
+{{~ else if column.csharp_type == "bool" ~}}
+  {{ column.name }}: yup.boolean().default(false),
+{{~ else if column.csharp_type == "DateTime" ~}}
+  {{ column.name }}: yup.date().nullable(),
+{{~ else ~}}
+  {{ column.name }}: yup.mixed().nullable(),
+{{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}
+});
+
+export const validateField = async (name: string, value: any) => {
+  try {
+    const schemas = yup.object().shape({
+      [name]: schema.fields[name],
+    });
+    await schemas.validate({ [name]: value }, { abortEarly: false });
+    return { isValid: true, error: "" };
+  } catch (validationError: any) {
+    return { isValid: false, error: validationError.errors[0] };
+  }
+};
+
+export const validate = async (data: any) => {
+  try {
+    await schema.validate(data, { abortEarly: false });
+    return { isValid: true, errors: {} };
+  } catch (validationErrors: any) {
+    let errors: any = {};
+    validationErrors.inner.forEach((error: any) => {
+      errors[error.path] = error.message;
+    });
+    return { isValid: false, errors };
+  }
+};
