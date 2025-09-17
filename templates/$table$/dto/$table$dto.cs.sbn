@@ -1,0 +1,30 @@
+namespace WebApi.Dtos
+{
+    public class Create{{ entity_name }}Request
+    {
+{{~ for column in columns ~}}
+{{~ if column.Name != "id" ~}}
+        {{~ if column.CSharpType != "string" ~}}
+        public {{ column.CSharpType }}? {{ column.Name }} { get; set; }
+        {{~ else ~}}
+        public {{ column.CSharpType }} {{ column.Name }} { get; set; }
+        {{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}
+    }
+
+    public class Update{{ entity_name }}Request
+    {
+{{~ for column in columns ~}}
+        {{~ if column.Name == "id" ~}}
+        public {{ column.CSharpType }} {{ column.Name }} { get; set; }
+        {{~ else ~}}
+            {{~ if column.CSharpType != "string" ~}}
+        public {{ column.CSharpType }}? {{ column.Name }} { get; set; }
+            {{~ else ~}}
+        public {{ column.CSharpType }} {{ column.Name }} { get; set; }
+            {{~ end ~}}
+        {{~ end ~}}
+{{~ end ~}}
+    }
+}

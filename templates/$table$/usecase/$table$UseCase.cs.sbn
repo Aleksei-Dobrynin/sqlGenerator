@@ -1,0 +1,54 @@
+﻿using Application.Models;
+using Application.Repositories;
+using Domain.Entities;
+
+namespace Application.UseCases
+{
+    public class {{ entity_name }}UseCases
+    {
+        private readonly IUnitOfWork unitOfWork;
+
+        public {{ entity_name }}UseCases(IUnitOfWork unitOfWork)
+        {
+            this.unitOfWork = unitOfWork;
+        }
+
+        public Task<List<{{ entity_name }}>> GetAll()
+        {
+            return unitOfWork.{{ entity_name }}Repository.GetAll();
+        }
+        
+        public Task<{{ entity_name }}> GetOneByID(int id)
+        {
+            return unitOfWork.{{ entity_name }}Repository.GetOneByID(id);
+        }
+
+        public async Task<{{ entity_name }}> Create({{ entity_name }} domain)
+        {
+            var result = await unitOfWork.{{ entity_name }}Repository.Add(domain);
+            domain.id = result;
+            unitOfWork.Commit();
+            return domain;
+        }
+
+        public async Task<{{ entity_name }}> Update({{ entity_name }} domain)
+        {
+            await unitOfWork.{{ entity_name }}Repository.Update(domain);
+            unitOfWork.Commit();
+            return domain;
+        }
+
+        public Task<PaginatedList<{{ entity_name }}>> GetPagniated(int pageSize, int pageNumber)
+        {
+            if (pageSize < 1) pageSize = 1;
+            if (pageNumber < 1) pageNumber = 1;
+            return unitOfWork.{{ entity_name }}Repository.GetPaginated(pageSize, pageNumber);
+        }
+
+        public async Task Delete(int id)
+        {
+            await unitOfWork.{{ entity_name }}Repository.Delete(id);
+            unitOfWork.Commit();
+        }
+    }
+}
