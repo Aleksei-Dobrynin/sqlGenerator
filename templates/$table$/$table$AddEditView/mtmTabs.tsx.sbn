@@ -6,20 +6,6 @@ import { observer } from 'mobx-react';
 import { Paper } from '@mui/material';
 import store from './store';
 import { useTranslation } from 'react-i18next';
-{{~ 
-  # Find all tables that reference this table
-  related_tables = []
-  for other_table in all_tables
-    for fk in other_table.foreign_keys
-      if fk.references_table == table_name
-        related_tables = related_tables | array.add other_table
-      end
-    end
-  end
-~}}
-{{~ for related in related_tables ~}}
-import {{ related.entity_name }}ListView from 'features/{{ related.table_name | to_snake_case }}/{{ related.table_name | to_snake_case }}ListView/index';
-{{~ end ~}}
 
 const {{ entity_name }}MtmTabs = observer(() => {
   const [value, setValue] = React.useState(0);
@@ -30,32 +16,8 @@ const {{ entity_name }}MtmTabs = observer(() => {
     setValue(newValue);
   };
 
-{{~ if related_tables.size > 0 ~}}
-  return (
-    <Box component={Paper} elevation={5}>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
-{{~ for related in related_tables ~}}
-          <Tab 
-            data-testid="{{ related.entity_name }}_tab_title" 
-            label={translate("label:{{ related.entity_name }}AddEditView.entityTitle")} 
-            {...a11yProps({{ for.index }})} 
-          />
-{{~ end ~}}
-        </Tabs>
-      </Box>
-      
-{{~ for related in related_tables ~}}
-      <CustomTabPanel value={value} index={{ for.index }}>
-        <{{ related.entity_name }}ListView idMain={store.id} />
-      </CustomTabPanel>
-{{~ end ~}}
-    </Box>
-  );
-{{~ else ~}}
   // No related tables found
   return null;
-{{~ end ~}}
 })
 
 interface TabPanelProps {
@@ -71,19 +33,19 @@ function CustomTabPanel(props: TabPanelProps) {
     <div
       role="tabpanel"
       hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
+      id={`simple-tabpanel-$\{index\}`}
+      aria-labelledby={`simple-tab-$\{index\}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={\{ p: 3 \}}>{children}</Box>}
     </div>
   );
 }
 
 function a11yProps(index: number) {
   return {
-    id: `simple-tab-${index}`,
-    'aria-controls': `simple-tabpanel-${index}`,
+    id: `simple-tab-$\{index\}`,
+    'aria-controls': `simple-tabpanel-$\{index\}`,
   };
 }
 

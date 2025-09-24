@@ -1,0 +1,127 @@
+﻿import { makeAutoObservable, runInAction } from "mobx";
+import i18n from "i18next";
+import MainStore from "MainStore";
+import { get{{ entity_name }}s } from "api/{{ entity_name }}/useGet{{ entity_name }}s";
+import { delete{{ entity_name }} } from "api/{{ entity_name }}/useDelete{{ entity_name }}";
+
+class NewStore {
+  data = [];
+  mainData = [];
+  openPanel = false;
+  currentId = 0;
+  searchField = "";
+{{~ if foreign_keys.size > 0 ~}}
+  // For child list views (when used in tabs)
+  idMain = 0;
+{{~ end ~}}
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  onEditClicked(id: number) {
+    runInAction(() => {
+      this.openPanel = true;
+      this.currentId = id;
+    });
+  }
+
+  changeSearch = (value: string) => {
+    this.searchField = value;
+  }
+
+  onSearchClicked = () => {
+    const searchLower = this.searchField?.toLowerCase();
+    const data = this.mainData.filter(x => {
+      // Search by main text fields
+      const searchableFields = [];
+      {{~ for col in columns ~}}
+      {{~ if col.name != "created_by" and col.name != "updated_by" and col.name != "created_at" and col.name != "updated_at" and col.name != "id" ~}}
+      if (x?.{{ col.name }}) searchableFields.push(String(x.{{ col.name }}));
+      {{~ end ~}}
+      {{~ end ~}}
+      
+      const searchableText = searchableFields.join(' ').toLowerCase();
+      return searchableText.includes(searchLower);
+    });
+    this.data = data;
+  }
+
+  clearSearch() {
+    this.searchField = "";
+    this.load{{ entity_name }}s();
+  }
+
+  closePanel() {
+    runInAction(() => {
+      this.openPanel = false;
+      this.currentId = 0;
+    });
+  }
+
+  load{{ entity_name }}s = async ({{~ if foreign_keys.size > 0 ~}}parentId?: number{{~ end ~}}) => {
+    try {
+      MainStore.changeLoader(true);
+      {{~ if foreign_keys.size > 0 ~}}
+      // If this is a child list, filter by parent
+      const params = parentId || this.idMain ? { parentId: parentId || this.idMain } : {};
+      const response = await get{{ entity_name }}s(params);
+      {{~ else ~}}
+      const response = await get{{ entity_name }}s();
+      {{~ end ~}}
+      if ((response.status === 201 || response.status === 200) && response?.data !== null) {
+        runInAction(() => {
+          this.data = response.data;
+          this.mainData = response.data;
+        });
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      MainStore.setSnackbar(i18n.t("message:somethingWentWrong"), "error");
+    } finally {
+      MainStore.changeLoader(false);
+    }
+  };
+
+  delete{{ entity_name }} = (id: number) => {
+    MainStore.openErrorConfirm(
+      i18n.t("areYouSure"),
+      i18n.t("delete"),
+      i18n.t("no"),
+      async () => {
+        try {
+          MainStore.changeLoader(true);
+          const response = await delete{{ entity_name }}(id);
+          if (response.status === 201 || response.status === 200) {
+            this.load{{ entity_name }}s();
+            MainStore.setSnackbar(i18n.t("message:snackbar.successDelete"), "success");
+          } else {
+            throw new Error();
+          }
+        } catch (err) {
+          MainStore.setSnackbar(i18n.t("message:somethingWentWrong"), "error");
+        } finally {
+          MainStore.changeLoader(false);
+          MainStore.onCloseConfirm();
+        }
+      },
+      () => MainStore.onCloseConfirm()
+    );
+  };
+
+  clearStore = () => {
+    runInAction(() => {
+      this.data = [];
+      this.mainData = [];
+      this.currentId = 0;
+      this.openPanel = false;
+      this.searchField = "";
+      {{~ if foreign_keys.size > 0 ~}}
+      this.idMain = 0;
+      {{~ end ~}}
+    });
+  };
+}
+
+export default new NewStore();

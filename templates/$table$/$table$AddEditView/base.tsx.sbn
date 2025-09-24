@@ -33,7 +33,7 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
   const { t } = useTranslation();
   const translate = t;
   return (
-    <Container maxWidth='xl' sx={{ mt: 3 }} style={{ marginTop: props.isPopup ? 0 : 20, marginBottom: props.isPopup ? 0 : 20 }}>
+    <Container maxWidth='xl' sx={\{ mt: 3 \}} style={\{ marginTop: props.isPopup ? 0 : 20, marginBottom: props.isPopup ? 0 : 20 \}}>
       <Grid container spacing={3}>
         <Grid item md={props.isPopup ? 12 : 6}>
           <form data-testid="{{ entity_name }}Form" id="{{ entity_name }}Form" autoComplete='off'>
@@ -47,25 +47,9 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
                 <Divider />
                 <CardContent>
                   <Grid container spacing={3}>
-{{~ for column in columns ~}}
-{{~ if column.name != "id" and column.name != "created_at" and column.name != "updated_at" and column.name != "created_by" and column.name != "updated_by" ~}}
+{{~ for column in editable_columns ~}}
 {{~ if column.is_foreign_key ~}}
                     {/* FK Lookup for {{ column.name }} */}
-                    {{~ if column.name == (table_name | to_snake_case) + "_id" || column.name == "parent_id" ~}}
-                    {/* Commented out self-reference or parent table reference */}
-                    {/* <Grid item md={12} xs={12}>
-                      <LookUp
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        data={store.{{ column.name | string.replace "_id" "" | to_snake_case }}_list}
-                        id="id_f_{{ entity_name }}_{{ column.name }}"
-                        label={translate("label:{{ entity_name }}AddEditView.{{ column.name }}")}
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid> */}
-                    {{~ else ~}}
                     <Grid item md={12} xs={12}>
                       <LookUp
                         value={store.{{ column.name }}}
@@ -78,7 +62,6 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
                         error={!!store.errors.{{ column.name }}}
                       />
                     </Grid>
-                    {{~ end ~}}
 {{~ else if column.csharp_type == "bool" ~}}
                     <Grid item md={12} xs={12}>
                       <CustomCheckbox
@@ -114,7 +97,6 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
                         error={!!store.errors.{{ column.name }}}
                       />
                     </Grid>
-{{~ end ~}}
 {{~ end ~}}
 {{~ end ~}}
                   </Grid>

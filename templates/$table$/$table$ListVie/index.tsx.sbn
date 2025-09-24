@@ -1,0 +1,134 @@
+﻿import { FC, useEffect } from 'react';
+import {
+  Box,
+  Container,
+  IconButton,
+  InputAdornment,
+} from '@mui/material';
+import PageGrid from 'components/PageGrid';
+import { observer } from "mobx-react";
+import store from "./store";
+import { useTranslation } from 'react-i18next';
+import { GridColDef } from '@mui/x-data-grid';
+import PopupGrid from 'components/PopupGrid';
+import {{ entity_name }}PopupForm from './../{{ entity_name }}AddEditView/popupForm';
+import CustomTextField from 'components/TextField';
+import CustomButton from 'components/Button';
+import ClearIcon from "@mui/icons-material/Clear";
+
+type {{ entity_name }}ListViewProps = {
+  {{~ if foreign_keys.size > 0 ~}}
+  idMain?: number; // For use as child list in tabs
+  {{~ end ~}}
+};
+
+const {{ entity_name }}ListView: FC<{{ entity_name }}ListViewProps> = observer((props) => {
+  const { t } = useTranslation();
+  const translate = t;
+
+  useEffect(() => {
+    {{~ if foreign_keys.size > 0 ~}}
+    // If used as child list, set the parent ID
+    if (props.idMain) {
+      store.idMain = props.idMain;
+    }
+    store.load{{ entity_name }}s(props.idMain);
+    {{~ else ~}}
+    store.load{{ entity_name }}s();
+    {{~ end ~}}
+    return () => {
+      store.clearStore();
+    }
+  }, [{{~ if foreign_keys.size > 0 ~}}props.idMain{{~ end ~}}]);
+
+  const columns: GridColDef[] = [
+    {{~ for column in columns ~}}
+    {{~ if column.name != "id" and column.name != "created_at" and column.name != "updated_at" and column.name != "created_by" and column.name != "updated_by" ~}}
+    {
+      field: '{{ column.name }}',
+      headerName: translate("label:{{ entity_name }}ListView.{{ column.name }}"),
+      flex: 1{{~ if column.is_foreign_key ~}},
+      valueGetter: (params) => params.row.{{ column.name | remove_id_suffix }}_name || params.row.{{ column.name }}{{~ end ~}}
+    },
+    {{~ end ~}}
+    {{~ end ~}}
+  ].filter(Boolean);
+
+  // Configuration for grid type (can be changed to 'popup' if needed)
+  let gridType: string = '{{~ if foreign_keys.size > 0 ~}}popup{{~ else ~}}form{{~ end ~}}';
+  let component = null;
+
+  switch (gridType) {
+    case 'form':
+      component = (
+        <PageGrid
+          title={translate("label:{{ entity_name }}ListView.entityTitle")}
+          onDeleteClicked={(id: number) => store.delete{{ entity_name }}(id)}
+          columns={columns}
+          data={store.data}
+          tableName="{{ entity_name }}"
+        />
+      );
+      break;
+    case 'popup':
+      component = (
+        <PopupGrid
+          title={translate("label:{{ entity_name }}ListView.entityTitle")}
+          onDeleteClicked={(id: number) => store.delete{{ entity_name }}(id)}
+          onEditClicked={(id: number) => store.onEditClicked(id)}
+          columns={columns}
+          data={store.data}
+          tableName="{{ entity_name }}"
+        />
+      );
+      break;
+  }
+
+  return (
+    <Container maxWidth='xl' style=\{\{ margin: {{~ if foreign_keys.size > 0 ~}}0{{~ else ~}}30{{~ end ~}} \}\}>
+      {{~ # Only show search if we have text columns to search ~}}
+      {{~ text_columns = columns | array.filter @(do; ret ($.csharp_type == "string" and $.name != "created_by" and $.name != "updated_by"); end) ~}}
+      {{~ if text_columns.size > 0 ~}}
+      <Box sx=\{\{ maxWidth: 500, minWidth: 300, mb: 2, ml: 1 \}\} display={"flex"} alignItems={"center"}>
+        <CustomTextField
+          value={store.searchField}
+          onChange={(e) => store.changeSearch(e.target.value)}
+          label={translate("common:search")}
+          onKeyDown={(e) => e.keyCode === 13 && store.onSearchClicked()}
+          name="{{ entity_name }}SearchField"
+          id="{{ entity_name }}SearchField"
+          InputProps=\{\{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  id="{{ entity_name | to_snake_case }}_clear_btn"
+                  onClick={() => store.clearSearch()}
+                >
+                  <ClearIcon />
+                </IconButton>
+              </InputAdornment>
+            )
+          \}\}
+        />
+        <CustomButton sx=\{\{ ml: 1 \}\} variant='contained' size="small" onClick={() => { store.onSearchClicked() }}>
+          {translate("common:Find")}
+        </CustomButton>
+      </Box>
+      {{~ end ~}}
+      
+      {component}
+
+      <{{ entity_name }}PopupForm
+        openPanel={store.openPanel}
+        id={store.currentId}
+        onBtnCancelClick={() => store.closePanel()}
+        onSaveClick={() => {
+          store.closePanel();
+          store.load{{ entity_name }}s({{~ if foreign_keys.size > 0 ~}}store.idMain{{~ end ~}});
+        }}
+      />
+    </Container>
+  );
+});
+
+export default {{ entity_name }}ListView;

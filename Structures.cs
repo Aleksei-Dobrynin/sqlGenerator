@@ -61,6 +61,9 @@ namespace SQLFileGenerator
         public bool IsForeignKey { get; set; }
 
         public bool IsNullable { get; set; }
+
+        public string? localizationKey { get; set; }
+        public string? comment { get; set; }
     }
 
     /// <summary>

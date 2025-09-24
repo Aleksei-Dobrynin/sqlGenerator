@@ -68,9 +68,25 @@ namespace SQLFileGenerator
                              .Select(w => w.ToLower());
             return string.Join("_", words);
         }
+
+        /// <summary>
+        /// Удаляет суффикс "_id" из строки
+        /// Например: "user_id" -> "user", "type_id" -> "type"
+        /// </summary>
+        public static string RemoveIdSuffix(this string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return input;
+
+            if (input.EndsWith("_id", StringComparison.OrdinalIgnoreCase))
+            {
+                return input.Substring(0, input.Length - 3);
+            }
+
+            return input;
+        }
     }
 
-    //TODO настроить папку templates чтобы она не участвовала в build action и не обрабатывалась дебагером и переносилась в output папку 
     /// <summary>
     /// Класс для генерации файлов на основе шаблонов Scriban.
     /// Позволяет создавать множество файлов для каждой таблицы из базы данных,
@@ -105,6 +121,47 @@ namespace SQLFileGenerator
                 "varchar" => "string",
                 "date" => "DateTime",
                 _ => "object" // По умолчанию
+            };
+        }
+
+        /// <summary>
+        /// Создает словарь данных для колонки с поддержкой обоих стилей именования
+        /// </summary>
+        private static Dictionary<string, object> CreateColumnData(ColumnSchema column, bool isSystemColumn = false)
+        {
+            return new Dictionary<string, object>
+            {
+                // PascalCase версии для обратной совместимости с существующими шаблонами
+                ["Name"] = column.Name,
+                ["CSharpType"] = column.CSharpType,
+                ["IsPrimaryKey"] = column.IsPrimaryKey,
+                ["IsForeignKey"] = column.IsForeignKey,
+                ["IsNullable"] = column.IsNullable,
+                ["IsSystem"] = isSystemColumn,
+
+                // snake_case версии для новых шаблонов
+                ["name"] = column.Name,
+                ["csharp_type"] = column.CSharpType,
+                ["is_primary_key"] = column.IsPrimaryKey,
+                ["is_foreign_key"] = column.IsForeignKey,
+                ["is_nullable"] = column.IsNullable,
+                ["is_system"] = isSystemColumn
+            };
+        }
+
+        /// <summary>
+        /// Создает словарь данных для внешнего ключа с поддержкой обоих стилей именования
+        /// </summary>
+        private static Dictionary<string, object> CreateForeignKeyData(ForeignKeyInfo fk)
+        {
+            return new Dictionary<string, object>
+            {
+                // snake_case версии
+                ["column_name"] = fk.ColumnName,
+                ["csharp_type"] = fk.CSharpType,
+                ["references_table"] = fk.ReferencesTable,
+                ["references_column"] = fk.ReferencesColumn,
+                ["constraint_name"] = fk.ConstraintName
             };
         }
 
@@ -190,34 +247,42 @@ namespace SQLFileGenerator
                 var scriptObject = new ScriptObject();
                 scriptObject["entity_name"] = table.EntityName;
                 scriptObject["table_name"] = table.TableName;
-                scriptObject["columns"] = table.Columns.Select(c => new Dictionary<string, object>
-                {
-                    ["Name"] = c.Name,
-                    ["CSharpType"] = c.CSharpType,
-                    ["IsPrimaryKey"] = c.IsPrimaryKey,
-                    ["IsForeignKey"] = c.IsForeignKey,
-                    ["IsNullable"] = c.IsNullable
-                }).ToArray();
+
+                // Определяем системные колонки
+                var systemColumns = new HashSet<string> { "id", "created_at", "updated_at", "created_by", "updated_by" };
+
+                // Все колонки с поддержкой ОБОИХ стилей именования
+                scriptObject["columns"] = table.Columns.Select(c =>
+                    CreateColumnData(c, systemColumns.Contains(c.Name.ToLower()))
+                ).ToArray();
+
+                // Добавляем отфильтрованные колонки для удобства использования в шаблонах
+                scriptObject["editable_columns"] = table.Columns
+                    .Where(c => !systemColumns.Contains(c.Name.ToLower()))
+                    .Select(c => CreateColumnData(c, false))
+                    .ToArray();
 
                 // Отладочный вывод
                 Console.WriteLine($"Processing: Table {table.EntityName} with {table.Columns.Count} columns");
 
-                scriptObject["foreign_keys"] = table.ForeignKeys.Select(fk => new Dictionary<string, object>
-                {
-                    ["column_name"] = fk.ColumnName,
-                    ["csharp_type"] = fk.CSharpType,
-                    ["references_table"] = fk.ReferencesTable,
-                    ["references_column"] = fk.ReferencesColumn
-                }).ToArray();
+                // Foreign keys с поддержкой snake_case
+                scriptObject["foreign_keys"] = table.ForeignKeys.Select(fk =>
+                    CreateForeignKeyData(fk)
+                ).ToArray();
 
-                // Добавляем информацию о первичном ключе
+                // Primary key с поддержкой ОБОИХ стилей именования
                 var primaryKeyColumn = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
                 if (primaryKeyColumn != null)
                 {
                     scriptObject["primary_key"] = new Dictionary<string, object>
                     {
+                        // PascalCase версии
                         ["Name"] = primaryKeyColumn.Name,
-                        ["CSharpType"] = primaryKeyColumn.CSharpType
+                        ["CSharpType"] = primaryKeyColumn.CSharpType,
+
+                        // snake_case версии
+                        ["name"] = primaryKeyColumn.Name,
+                        ["csharp_type"] = primaryKeyColumn.CSharpType
                     };
                 }
                 else
@@ -230,6 +295,7 @@ namespace SQLFileGenerator
                 scriptObject.Import("to_pascal_case", new Func<string, string>(StringExtensions.ToPascalCase));
                 scriptObject.Import("to_camel_case", new Func<string, string>(StringExtensions.ToCamelCase));
                 scriptObject.Import("to_snake_case", new Func<string, string>(StringExtensions.ToSnakeCase));
+                scriptObject.Import("remove_id_suffix", new Func<string, string>(StringExtensions.RemoveIdSuffix));
 
                 var context = new TemplateContext();
                 context.PushGlobal(scriptObject);

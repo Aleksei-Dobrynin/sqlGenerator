@@ -33,7 +33,7 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
   const { t } = useTranslation();
   const translate = t;
   return (
-    <Container maxWidth='xl' sx={{ mt: 3 }} style={{ marginTop: props.isPopup ? 0 : 20, marginBottom: props.isPopup ? 0 : 20 }}>
+    <Container maxWidth='xl' sx={\{ mt: 3 \}} style={\{ marginTop: props.isPopup ? 0 : 20, marginBottom: props.isPopup ? 0 : 20 \}}>
       <Grid container spacing={3}>
         <Grid item md={props.isPopup ? 12 : 6}>
           <form data-testid="{{ entity_name }}Form" id="{{ entity_name }}Form" autoComplete='off'>
@@ -47,11 +47,11 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
                 <Divider />
                 <CardContent>
                   <Grid container spacing={3}>
-{{~ for column in columns ~}}
-{{~ if column.name != "id" && column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
+{{~ for column in editable_columns ~}}
 {{~ if column.is_foreign_key ~}}
                     {/* FK Lookup for {{ column.name }} */}
-                    {{~ if column.name == (table_name | to_snake_case) + "_id" || column.name == "parent_id" ~}}
+                    {{~ self_ref = (column.name == (table_name | to_snake_case) + "_id") or (column.name == "parent_id") ~}}
+                    {{~ if self_ref ~}}
                     {/* Commented out self-reference or parent table reference */}
                     {/* <Grid item md={12} xs={12}>
                       <LookUp
@@ -114,7 +114,6 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
                         error={!!store.errors.{{ column.name }}}
                       />
                     </Grid>
-{{~ end ~}}
 {{~ end ~}}
 {{~ end ~}}
                   </Grid>
