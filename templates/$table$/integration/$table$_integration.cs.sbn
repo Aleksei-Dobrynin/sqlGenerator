@@ -1,0 +1,27 @@
+﻿// IUnitOfWork
+
+I{{ entity_name | to_camel_case }}Repository {{ entity_name | to_camel_case }}Repository { get; }}}
+
+// UnitOfWork
+
+private readonly I{{ entity_name | to_camel_case }}Repository _{{ entity_name | to_camel_case }}Repository;
+
+// ...
+
+public I{{ entity_name | to_camel_case }}Repository _{{ entity_name | to_pascal_case }}Repository
+{
+    get
+    {
+        if (_{{ entity_name | to_pascal_case }}Repository == null)
+        {
+            _{{ entity_name | to_pascal_case }}Repository = new {{ entity_name | to_camel_case }}Repository(_dbConnection, _appEnvironment, _userRepository);
+            _{{ entity_name | to_pascal_case }}Repository.SetTransaction(_dbTransaction);
+        }
+        return _{{ entity_name | to_pascal_case }}Repository;
+    }
+}
+
+// Program
+
+builder.Services.AddScoped<I{{ entity_name | to_camel_case }}Repository, {{ entity_name | to_camel_case }}Repository>();
+builder.Services.AddScoped<{{ entity_name | to_camel_case }}UseCases>();
