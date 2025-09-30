@@ -4,8 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using SQLFileGenerator.structures;
 
-namespace SQLFileGenerator
+namespace SQLFileGenerator.parsers
 {
     /// <summary>
     /// Класс для анализа SQL-скриптов и преобразования их в структуры данных.

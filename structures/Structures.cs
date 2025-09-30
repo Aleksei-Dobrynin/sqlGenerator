@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SQLFileGenerator
+namespace SQLFileGenerator.structures
 {
     /// <summary>
     /// Представляет структуру таблицы базы данных, включая её имя, соответствующее имя сущности,
