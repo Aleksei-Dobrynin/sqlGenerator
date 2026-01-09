@@ -282,7 +282,3 @@ Generated files will be placed in the specified folder or in the default result 
 - 🔤 Implementation of more complex naming and transformation rules for various architectural styles.
 - 🌟 Support for more frontend frameworks and component libraries.
 - 🛠️ Integration with ORM frameworks like Entity Framework or Dapper.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

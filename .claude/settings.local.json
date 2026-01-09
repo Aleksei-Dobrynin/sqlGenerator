@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /b \"D:\\\\Practice\\\\SQLFileGenerator\")",
+      "Bash(ls -la \"D:\\\\Practice\\\\SQLFileGenerator\\\\sql\"\" && head -100 \"D:PracticeSQLFileGeneratorsqlscript.sql \")",
+      "Bash(find:*)"
+    ]
+  }
+}
