@@ -1,131 +1,93 @@
-﻿import React, { FC, useState } from "react";
-import { useNavigate } from 'react-router-dom';
-import { useLocation } from 'react-router';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  Divider,
-  Paper,
-  Grid,
-  Box,
-  Button,
-  Container,
-  Typography,
-  Stack,
-} from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import store from "./store"
-import { observer } from "mobx-react"
-import LookUp from 'components/LookUp';
-import CustomTextField from "components/TextField";
-import CustomCheckbox from "components/Checkbox";
-import CustomDateField from "components/DateField";
-import InfoIcon from "@mui/icons-material/Info";
-import MainStore from "MainStore";
+﻿import { FC, useEffect } from "react";
+import {{ entity_name }}AddEditBaseView from "./base";
+import store from "./store";
+import { observer } from "mobx-react";
+import { Dialog, DialogActions, DialogContent, DialogTitle, Grid } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import CustomButton from "components/Button";
+{{~ 
+  # Find child tables that reference this table
+  child_tables = []
+  for other_table in all_tables
+    for fk in other_table.foreign_keys
+      if fk.references_table == table_name
+        child_tables = child_tables | array.add other_table
+      end
+    end
+  end
+~}}
+{{~ if child_tables.size > 0 ~}}
+// Import child table fast input forms
+{{~ for child in child_tables ~}}
+import FastInput{{ child.entity_name }}View from "features/{{ child.table_name | to_snake_case }}/{{ child.entity_name }}AddEditView/fastInput";
+{{~ end ~}}
+{{~ end ~}}
 
-type {{ entity_name }}TableProps = {
-  children?: React.ReactNode;
-  isPopup?: boolean;
-};
+type PopupFormProps = {
+  openPanel: boolean;
+  id: number;
+  onBtnCancelClick: () => void;
+  onSaveClick: (id: number) => void;
+}
 
-const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observer((props) => {
+const PopupForm: FC<PopupFormProps> = observer((props) => {
   const { t } = useTranslation();
   const translate = t;
-  return (
-    <Container maxWidth='xl' sx={\{ mt: 3 \}} style={\{ marginTop: props.isPopup ? 0 : 20, marginBottom: props.isPopup ? 0 : 20 \}}>
-      <Grid container spacing={3}>
-        <Grid item md={props.isPopup ? 12 : 6}>
-          <form data-testid="{{ entity_name }}Form" id="{{ entity_name }}Form" autoComplete='off'>
-            <Paper elevation={props.isPopup ? 0 : 7}>
-              <Card>
-                <CardHeader title={
-                  <span id="{{ entity_name }}_TitleName">
-                    {translate('label:{{ entity_name }}AddEditView.entityTitle')}
-                  </span>
-                } />
-                <Divider />
-                <CardContent>
-                  <Grid container spacing={3}>
-{{~ for column in editable_columns ~}}
-{{~ if column.is_foreign_key ~}}
-                    {/* FK Lookup for {{ column.name }} */}
-                    {{~ self_ref = (column.name == (table_name | to_snake_case) + "_id") or (column.name == "parent_id") ~}}
-                    {{~ if self_ref ~}}
-                    {/* Commented out self-reference or parent table reference */}
-                    {/* <Grid item md={12} xs={12}>
-                      <LookUp
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        data={store.{{ column.name | string.replace "_id" "" | to_snake_case }}_list}
-                        id="id_f_{{ entity_name }}_{{ column.name }}"
-                        label={translate("label:{{ entity_name }}AddEditView.{{ column.name }}")}
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid> */}
-                    {{~ else ~}}
-                    <Grid item md={12} xs={12}>
-                      <LookUp
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        data={store.{{ column.name | string.replace "_id" "" | to_snake_case }}_list}
-                        id="id_f_{{ entity_name }}_{{ column.name }}"
-                        label={translate("label:{{ entity_name }}AddEditView.{{ column.name }}")}
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid>
-                    {{~ end ~}}
-{{~ else if column.csharp_type == "bool" ~}}
-                    <Grid item md={12} xs={12}>
-                      <CustomCheckbox
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        label={translate('label:{{ entity_name }}AddEditView.{{ column.name }}')}
-                        id='id_f_{{ entity_name }}_{{ column.name }}'
-                      />
-                    </Grid>
-{{~ else if column.csharp_type == "DateTime" ~}}
-                    <Grid item md={12} xs={12}>
-                      <CustomDateField
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        label={translate('label:{{ entity_name }}AddEditView.{{ column.name }}')}
-                        id='id_f_{{ entity_name }}_{{ column.name }}'
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid>
-{{~ else ~}}
-                    <Grid item md={12} xs={12}>
-                      <CustomTextField
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        data-testid="id_f_{{ entity_name }}_{{ column.name }}"
-                        id='id_f_{{ entity_name }}_{{ column.name }}'
-                        label={translate('label:{{ entity_name }}AddEditView.{{ column.name }}')}
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid>
-{{~ end ~}}
-{{~ end ~}}
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Paper>
-          </form>
-        </Grid>
-        {props.children}
-      </Grid>
-    </Container>
-  );
-})
 
-export default {{ entity_name }}AddEditBaseView;
+  useEffect(() => {
+    if (props.openPanel) {
+      store.doLoad(props.id);
+    } else {
+      store.clearStore();
+    }
+  }, [props.openPanel]);
+
+  return (
+    <Dialog open={props.openPanel} onClose={props.onBtnCancelClick} fullWidth={true} maxWidth="lg">
+      <DialogTitle>{translate("label:{{ entity_name }}AddEditView.entityTitle")}</DialogTitle>
+      <DialogContent>
+
+        <Grid container>
+          <Grid md={{{~ if child_tables.size > 0 ~}}6{{~ else ~}}12{{~ end ~}}} xs={12} item>
+            <{{ entity_name }}AddEditBaseView
+              isPopup={true}
+            >
+            </{{ entity_name }}AddEditBaseView>
+          </Grid>
+{{~ if child_tables.size > 0 ~}}
+          <Grid md={6} xs={12} item>
+            {store.id !== 0 && (
+              <>
+{{~ for child in child_tables ~}}
+                <FastInput{{ child.entity_name }}View idMain={store.id} />
+{{~ end ~}}
+              </>
+            )}
+          </Grid>
+{{~ end ~}}
+        </Grid>
+
+      </DialogContent>
+      <DialogActions>
+        <CustomButton
+          variant="contained"
+          id="id_{{ entity_name }}SaveButton"
+          onClick={() => {
+            store.onSaveClick((id: number) => props.onSaveClick(id));
+          }}
+        >
+          {translate("common:save")}
+        </CustomButton>
+        <CustomButton
+          variant="contained"
+          id="id_{{ entity_name }}CancelButton"
+          onClick={() => props.onBtnCancelClick()}
+        >
+          {translate("common:cancel")}
+        </CustomButton>
+      </DialogActions>
+    </Dialog>
+  );
+});
+
+export default PopupForm;

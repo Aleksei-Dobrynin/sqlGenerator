@@ -104,7 +104,7 @@ namespace SQLFileGenerator
         {
             foreach (var table in tables)
             {
-                ProcessTemplatesDirectory(templatesDir, resultDir, table);
+                ProcessTemplatesDirectory(templatesDir, resultDir, table, tables);
             }
         }
 
@@ -166,6 +166,19 @@ namespace SQLFileGenerator
         }
 
         /// <summary>
+        /// Создает полное представление таблицы для all_tables с минимальной информацией
+        /// </summary>
+        private static Dictionary<string, object> CreateTableData(TableSchema table)
+        {
+            return new Dictionary<string, object>
+            {
+                ["entity_name"] = table.EntityName,
+                ["table_name"] = table.TableName,
+                ["foreign_keys"] = table.ForeignKeys.Select(fk => CreateForeignKeyData(fk)).ToArray()
+            };
+        }
+
+        /// <summary>
         /// Обрабатывает директорию с шаблонами для конкретной таблицы.
         /// Сканирует все файлы в директории, применяет к ним шаблонизацию
         /// и сохраняет результаты в указанную директорию.
@@ -174,7 +187,8 @@ namespace SQLFileGenerator
         /// <param name="templatesDir">Путь к директории с шаблонами</param>
         /// <param name="resultDir">Путь к директории для сохранения результатов</param>
         /// <param name="table">Информация о таблице для шаблонизации</param>
-        public static void ProcessTemplatesDirectory(string templatesDir, string resultDir, TableSchema table)
+        /// <param name="allTables">Все таблицы схемы для поддержки master-detail шаблонов</param>
+        public static void ProcessTemplatesDirectory(string templatesDir, string resultDir, TableSchema table, List<TableSchema> allTables)
         {
             // Получаем все файлы (независимо от расширения)
             var templateFiles = Directory.GetFiles(templatesDir, "*", SearchOption.AllDirectories);
@@ -289,6 +303,9 @@ namespace SQLFileGenerator
                 {
                     scriptObject["primary_key"] = null;
                 }
+
+                // *** НОВОЕ: Добавляем все таблицы для поддержки master-detail паттерна ***
+                scriptObject["all_tables"] = allTables.Select(t => CreateTableData(t)).ToArray();
 
                 // Импортируем вспомогательные функции
                 scriptObject.Import("map_type", new Func<string, string>(MapType));

@@ -1,131 +1,75 @@
-﻿import React, { FC, useState } from "react";
-import { useNavigate } from 'react-router-dom';
-import { useLocation } from 'react-router';
+﻿import React, { FC, useEffect } from "react";
+import { default as {{ entity_name }}AddEditBaseView } from "./base";
+import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  Divider,
-  Paper,
-  Grid,
   Box,
-  Button,
-  Container,
-  Typography,
-  Stack,
-} from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import store from "./store"
-import { observer } from "mobx-react"
-import LookUp from 'components/LookUp';
-import CustomTextField from "components/TextField";
-import CustomCheckbox from "components/Checkbox";
-import CustomDateField from "components/DateField";
-import InfoIcon from "@mui/icons-material/Info";
-import MainStore from "MainStore";
+  Grid
+} from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { observer } from "mobx-react";
+import store from "./store";
+import CustomButton from "components/Button";
 
-type {{ entity_name }}TableProps = {
-  children?: React.ReactNode;
-  isPopup?: boolean;
-};
+type {{ entity_name }}Props = {};
 
-const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observer((props) => {
+const {{ entity_name }}AddEditView: FC<{{ entity_name }}Props> = observer((props) => {
   const { t } = useTranslation();
   const translate = t;
-  return (
-    <Container maxWidth='xl' sx={\{ mt: 3 \}} style={\{ marginTop: props.isPopup ? 0 : 20, marginBottom: props.isPopup ? 0 : 20 \}}>
-      <Grid container spacing={3}>
-        <Grid item md={props.isPopup ? 12 : 6}>
-          <form data-testid="{{ entity_name }}Form" id="{{ entity_name }}Form" autoComplete='off'>
-            <Paper elevation={props.isPopup ? 0 : 7}>
-              <Card>
-                <CardHeader title={
-                  <span id="{{ entity_name }}_TitleName">
-                    {translate('label:{{ entity_name }}AddEditView.entityTitle')}
-                  </span>
-                } />
-                <Divider />
-                <CardContent>
-                  <Grid container spacing={3}>
-{{~ for column in editable_columns ~}}
-{{~ if column.is_foreign_key ~}}
-                    {/* FK Lookup for {{ column.name }} */}
-                    {{~ self_ref = (column.name == (table_name | to_snake_case) + "_id") or (column.name == "parent_id") ~}}
-                    {{~ if self_ref ~}}
-                    {/* Commented out self-reference or parent table reference */}
-                    {/* <Grid item md={12} xs={12}>
-                      <LookUp
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        data={store.{{ column.name | string.replace "_id" "" | to_snake_case }}_list}
-                        id="id_f_{{ entity_name }}_{{ column.name }}"
-                        label={translate("label:{{ entity_name }}AddEditView.{{ column.name }}")}
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid> */}
-                    {{~ else ~}}
-                    <Grid item md={12} xs={12}>
-                      <LookUp
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        data={store.{{ column.name | string.replace "_id" "" | to_snake_case }}_list}
-                        id="id_f_{{ entity_name }}_{{ column.name }}"
-                        label={translate("label:{{ entity_name }}AddEditView.{{ column.name }}")}
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid>
-                    {{~ end ~}}
-{{~ else if column.csharp_type == "bool" ~}}
-                    <Grid item md={12} xs={12}>
-                      <CustomCheckbox
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        label={translate('label:{{ entity_name }}AddEditView.{{ column.name }}')}
-                        id='id_f_{{ entity_name }}_{{ column.name }}'
-                      />
-                    </Grid>
-{{~ else if column.csharp_type == "DateTime" ~}}
-                    <Grid item md={12} xs={12}>
-                      <CustomDateField
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        label={translate('label:{{ entity_name }}AddEditView.{{ column.name }}')}
-                        id='id_f_{{ entity_name }}_{{ column.name }}'
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid>
-{{~ else ~}}
-                    <Grid item md={12} xs={12}>
-                      <CustomTextField
-                        value={store.{{ column.name }}}
-                        onChange={(event) => store.handleChange(event)}
-                        name="{{ column.name }}"
-                        data-testid="id_f_{{ entity_name }}_{{ column.name }}"
-                        id='id_f_{{ entity_name }}_{{ column.name }}'
-                        label={translate('label:{{ entity_name }}AddEditView.{{ column.name }}')}
-                        helperText={store.errors.{{ column.name }}}
-                        error={!!store.errors.{{ column.name }}}
-                      />
-                    </Grid>
-{{~ end ~}}
-{{~ end ~}}
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Paper>
-          </form>
-        </Grid>
-        {props.children}
-      </Grid>
-    </Container>
-  );
-})
+  const navigate = useNavigate();
+  const query = useQuery();
+  const id = query.get("id");
 
-export default {{ entity_name }}AddEditBaseView;
+  useEffect(() => {
+    if ((id != null) &&
+      (id !== "") &&
+      !isNaN(Number(id.toString()))) {
+      store.doLoad(Number(id));
+    } else {
+      navigate("/error-404");
+    }
+    return () => {
+      store.clearStore();
+    };
+  }, []);
+
+  return (
+    <{{ entity_name }}AddEditBaseView {...props}>
+
+      <Grid item xs={12} spacing={0}>
+        <Box display="flex" p={2}>
+          <Box m={2}>
+            <CustomButton
+              variant="contained"
+              id="id_{{ entity_name }}SaveButton"
+              onClick={() => {
+                store.onSaveClick((id: number) => {
+                  navigate(`/user/{{ entity_name }}/addedit?id=${store.id}`);
+                });
+              }}
+            >
+              {translate("common:save")}
+            </CustomButton>
+          </Box>
+          <Box m={2}>
+            <CustomButton
+              variant="contained"
+              color={"secondary"}
+              sx={\\{color:"white", backgroundColor: "red !important"\\}}
+              id="id_{{ entity_name }}CancelButton"
+              onClick={() => navigate("/user/{{ entity_name }}")}
+            >
+              {translate("common:goOut")}
+            </CustomButton>
+          </Box>
+        </Box>
+      </Grid>
+    </{{ entity_name }}AddEditBaseView>
+  );
+});
+
+function useQuery() {
+  return new URLSearchParams(useLocation().search);
+}
+
+export default {{ entity_name }}AddEditView;

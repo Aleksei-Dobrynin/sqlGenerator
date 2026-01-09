@@ -1,0 +1,118 @@
+﻿import { FC, useEffect } from 'react';
+import {
+  Checkbox,
+  Container
+} from "@mui/material";
+import PageGrid from 'components/PageGrid';
+import { observer } from "mobx-react"
+import store from "./store"
+import { useTranslation } from 'react-i18next';
+import { GridColDef } from '@mui/x-data-grid';
+import PopupGrid from 'components/PopupGrid';
+import {{ entity_name }}PopupForm from './../{{ entity_name }}AddEditView/popupForm';
+import PageGridPagination from "components/PageGridPagination";
+import dayjs from 'dayjs';
+
+type {{ entity_name }}ListViewProps = {
+  idMain?: number;
+};
+
+const {{ entity_name }}ListView: FC<{{ entity_name }}ListViewProps> = observer((props) => {
+  const { t } = useTranslation();
+  const translate = t;
+
+  useEffect(() => {
+    if (props.idMain) {
+      store.setIdMain(props.idMain);
+    }
+    store.load{{ entity_name }}s()
+    return () => {
+      store.clearStore()
+    }
+  }, [props.idMain])
+
+  const columns: GridColDef[] = [
+{{~ for column in columns ~}}
+{{~ if !column.is_system ~}}
+{{~ if column.csharp_type == "bool" ~}}
+    {
+      field: '{{ column.name }}',
+      headerName: translate("label:{{ entity_name }}ListView.{{ column.name }}"),
+      flex: 1,
+      renderCell: param => {
+        return <Checkbox checked={param.row.{{ column.name }}} disabled />
+      }
+    },
+{{~ else if column.csharp_type == "DateTime" ~}}
+    {
+      field: '{{ column.name }}',
+      headerName: translate("label:{{ entity_name }}ListView.{{ column.name }}"),
+      flex: 1,
+      renderCell: param => {
+        return param.row.{{ column.name }} ? dayjs(param.row.{{ column.name }}).format('DD.MM.YYYY HH:mm') : '';
+      }
+    },
+{{~ else if column.is_foreign_key ~}}
+    {
+      field: '{{ column.name | to_camel_case }}NavName',
+      headerName: translate("label:{{ entity_name }}ListView.{{ column.name }}"),
+      flex: 1
+    },
+{{~ else ~}}
+    {
+      field: '{{ column.name }}',
+      headerName: translate("label:{{ entity_name }}ListView.{{ column.name }}"),
+      flex: 1
+    },
+{{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}
+  ];
+
+  let type1: string = 'form';
+  let component = null;
+  switch (type1) {
+    case 'form':
+      component = <PageGridPagination
+        title={translate("label:{{ entity_name }}ListView.entityTitle")}
+        onDeleteClicked={(id: number) => store.delete{{ entity_name }}(id)}
+        columns={columns}
+        page={store.pageNumber}
+        pageSize={store.pageSize}
+        changePagination={(page, pageSize) => store.changePagination(page, pageSize)}
+        changeSort={(sortModel) => store.changeSort(sortModel)}
+        searchText=''
+        totalCount={store.totalCount}
+        data={store.data}
+        tableName="{{ entity_name }}" />
+      break
+    case 'popup':
+      component = <PopupGrid
+        title={translate("label:{{ entity_name }}ListView.entityTitle")}
+        onDeleteClicked={(id: number) => store.delete{{ entity_name }}(id)}
+        onEditClicked={(id: number) => store.onEditClicked(id)}
+        columns={columns}
+        data={store.data}
+        tableName="{{ entity_name }}" />
+      break
+  }
+
+  return (
+    <Container maxWidth='xl' style={\\{ marginTop: 30 \\}}>
+      {component}
+
+      <{{ entity_name }}PopupForm
+        openPanel={store.openPanel}
+        id={store.currentId}
+        onBtnCancelClick={() => store.closePanel()}
+        onSaveClick={() => {
+          store.closePanel()
+          store.load{{ entity_name }}s()
+        }}
+      />
+
+    </Container>
+  );
+})
+
+export default {{ entity_name }}ListView
