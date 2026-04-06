@@ -13,6 +13,10 @@
     <Compile Remove="templates\Repository\**" />
     <EmbeddedResource Remove="templates\Repository\**" />
     <None Remove="templates\Repository\**" />
+    <!-- Exclude MCP project from this compilation -->
+    <Compile Remove="SqlGenerator.Mcp\**" />
+    <EmbeddedResource Remove="SqlGenerator.Mcp\**" />
+    <None Remove="SqlGenerator.Mcp\**" />
   </ItemGroup>
 
   <ItemGroup>

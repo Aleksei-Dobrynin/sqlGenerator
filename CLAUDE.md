@@ -89,3 +89,81 @@ LlmParser/         # LLM parser module
 - String case conversions in `StringExtensions` class (Generator.cs:13-87)
 - System columns (excluded from `editable_columns`): id, created_at, updated_at, created_by, updated_by (Generator.cs:266)
 - FK parsing handles both inline `REFERENCES` in columns and separate `ALTER TABLE ADD CONSTRAINT` statements
+
+## MCP Server (`SqlGenerator.Mcp/`)
+
+MCP (Model Context Protocol) сервер для интеграции с AI-агентами (Claude Desktop, etc.).
+
+### Build and Run MCP Server
+
+```bash
+# Build
+cd SqlGenerator.Mcp
+dotnet build
+
+# Run with MCP Inspector
+npx @anthropic/mcp-inspector dotnet run --project SqlGenerator.Mcp
+```
+
+### MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `parse_sql` | Regex parser for simple DDL. Returns schema file path |
+| `save_schema` | Save agent-parsed schema JSON |
+| `generate_files` | Generate code from schema.json file |
+| `quick_generate` | Parse + generate in one call (regex only) |
+
+### MCP Prompts
+
+| Prompt | Description |
+|--------|-------------|
+| `sql_parsing_instructions` | Instructions for agent to parse complex SQL into JSON format |
+
+### Usage Scenarios
+
+**Simple SQL (regex):**
+```
+Agent → quick_generate(sql, outputDir, templatesDir)
+```
+
+**Complex SQL (agent parses):**
+```
+Agent:
+  1. Get prompt: sql_parsing_instructions(sql)
+  2. Parse SQL following instructions
+  3. → save_schema(jsonResult, "schema.json")
+  4. → generate_files("schema.json", outputDir, templatesDir)
+```
+
+### Schema JSON Format
+
+```json
+[
+  {
+    "TableName": "users",
+    "EntityName": "Users",
+    "Columns": [
+      {"Name": "id", "CSharpType": "int", "IsPrimaryKey": true, "IsForeignKey": false, "IsNullable": false}
+    ],
+    "ForeignKeys": [
+      {"ColumnName": "role_id", "CSharpType": "int", "ReferencesTable": "roles", "ReferencesColumn": "id"}
+    ]
+  }
+]
+```
+
+### Claude Desktop Configuration
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "sql-generator": {
+      "command": "dotnet",
+      "args": ["run", "--project", "D:\\Practice\\sqlGenerator\\SqlGenerator.Mcp"]
+    }
+  }
+}
+```

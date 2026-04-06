@@ -29,16 +29,14 @@ namespace SqlToEntityGenerator
         {
             try
             {
-                // Парсинг аргументов командной строки
                 var useLlm = args.Contains("--use-llm");
                 var configPath = GetArgValue(args, "--config") ?? "appsettings.json";
                 var sqlScriptPath = GetArgValue(args, "--sql") ?? "sql/script.sql";
-                var templatesDir = "templates";
 
-                // Получаем путь к результирующей папке
+                string templatesDir = ResolveTemplatesDir(args, "templates");
+
                 string resultDir = GetArgValue(args, "--output") ?? GetResultDirFromArgs(args) ?? GetResultDirInteractive();
 
-                // Вывод информации о режиме работы
                 Console.WriteLine("=== SQL File Generator ===");
                 Console.WriteLine($"Parser mode: {(useLlm ? "LLM" : "Regex")}");
                 Console.WriteLine($"SQL script: {sqlScriptPath}");
@@ -46,7 +44,6 @@ namespace SqlToEntityGenerator
                 Console.WriteLine($"Output: {resultDir}");
                 Console.WriteLine();
 
-                // Чтение SQL-скрипта из файла
                 if (!File.Exists(sqlScriptPath))
                 {
                     Console.WriteLine($"SQL script file not found at {sqlScriptPath}");
@@ -55,7 +52,6 @@ namespace SqlToEntityGenerator
 
                 string sqlScript = File.ReadAllText(sqlScriptPath);
 
-                // Выбор парсера и парсинг SQL-скрипта
                 List<TableSchema> tables;
 
                 if (useLlm)
@@ -81,7 +77,6 @@ namespace SqlToEntityGenerator
 
                 Console.WriteLine($"Parsed {tables.Count} table(s) from the SQL script.");
 
-                // Генерация шаблонных файлов
                 if (!Directory.Exists(templatesDir))
                 {
                     Console.WriteLine($"Templates directory not found at {templatesDir}");
@@ -165,6 +160,81 @@ namespace SqlToEntityGenerator
             Console.Write("Enter output directory (default 'result'): ");
             var input = Console.ReadLine();
             return string.IsNullOrWhiteSpace(input) ? "result" : input;
+        }
+
+        /// <summary>
+        /// Определяет директорию шаблонов с поддержкой пресетов
+        /// </summary>
+        private static string ResolveTemplatesDir(string[] args, string templatesBaseDir)
+        {
+            if (!Directory.Exists(templatesBaseDir))
+                return templatesBaseDir;
+
+            var presetArg = GetArgValue(args, "--preset");
+            if (!string.IsNullOrEmpty(presetArg))
+            {
+                var presetPath = Path.Combine(templatesBaseDir, presetArg);
+                if (!Directory.Exists(presetPath))
+                {
+                    Console.WriteLine($"Preset '{presetArg}' not found in {templatesBaseDir}");
+                    var presets = GetAvailablePresets(templatesBaseDir);
+                    if (presets.Count > 0)
+                    {
+                        Console.WriteLine("Available presets:");
+                        for (int i = 0; i < presets.Count; i++)
+                            Console.WriteLine($"  {i + 1}. {presets[i]}");
+                    }
+                    Environment.Exit(1);
+                }
+                return presetPath;
+            }
+
+            if (Directory.Exists(Path.Combine(templatesBaseDir, "$table$")))
+                return templatesBaseDir;
+
+            var availablePresets = GetAvailablePresets(templatesBaseDir);
+            if (availablePresets.Count == 0)
+                return templatesBaseDir;
+
+            if (availablePresets.Count == 1)
+                return Path.Combine(templatesBaseDir, availablePresets[0]);
+
+            return Path.Combine(templatesBaseDir, GetPresetInteractive(availablePresets));
+        }
+
+        /// <summary>
+        /// Получает список доступных пресетов из директории templates
+        /// </summary>
+        private static List<string> GetAvailablePresets(string templatesBaseDir)
+        {
+            if (!Directory.Exists(templatesBaseDir))
+                return new List<string>();
+
+            return Directory.GetDirectories(templatesBaseDir)
+                .Select(Path.GetFileName)
+                .Where(name => name != null)
+                .ToList()!;
+        }
+
+        /// <summary>
+        /// Интерактивный выбор пресета из списка
+        /// </summary>
+        private static string GetPresetInteractive(List<string> presets)
+        {
+            Console.WriteLine("Available template presets:");
+            for (int i = 0; i < presets.Count; i++)
+                Console.WriteLine($"  {i + 1}. {presets[i]}");
+
+            while (true)
+            {
+                Console.Write($"Select preset (1-{presets.Count}): ");
+                var input = Console.ReadLine();
+
+                if (int.TryParse(input, out int choice) && choice >= 1 && choice <= presets.Count)
+                    return presets[choice - 1];
+
+                Console.WriteLine("Invalid selection, try again.");
+            }
         }
 
         /// <summary>
