@@ -273,6 +273,21 @@ Generated files will be placed in the specified folder or in the default result 
 - .NET 9.0
 - Scriban (templating library)
 
+## 🔌 MCP Server
+
+MCP (Model Context Protocol) server allows AI agents (Claude Desktop, etc.) to interact with the generator directly.
+
+For full agent integration specification see [`agent-spec.md`](agent-spec.md).
+
+```bash
+# Build MCP server
+cd SqlGenerator.Mcp
+dotnet build
+
+# Test with MCP Inspector
+npx @anthropic/mcp-inspector dotnet run --project SqlGenerator.Mcp
+```
+
 ## 🔮 Future Development
 
 - 🌐 Improved support for various SQL dialects.

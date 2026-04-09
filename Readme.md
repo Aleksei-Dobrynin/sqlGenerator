@@ -138,14 +138,21 @@ dotnet build
 npx @anthropic/mcp-inspector dotnet run --project SqlGenerator.Mcp
 ```
 
+### Принцип экономии токенов
+
+MCP-инструменты принимают ТОЛЬКО пути к файлам, не содержимое. Сервер читает/пишет файлы на диске напрямую. Агенты передают только пути. Это минимизирует расход контекстного окна и предотвращает деградацию качества на больших схемах.
+
+Полная спецификация для интеграции агентов: [`agent-spec-ru.md`](agent-spec-ru.md)
+
 ### MCP Tools
 
-| Инструмент | Описание |
-|------------|----------|
-| `parse_sql` | Regex парсер для простого DDL |
-| `save_schema` | Сохранение схемы, распарсенной агентом |
-| `generate_files` | Генерация кода из schema.json |
-| `quick_generate` | Парсинг + генерация одним вызовом |
+| Инструмент | Параметры | Описание |
+|------------|-----------|----------|
+| `parse_sql` | `sqlFilePath`, `outputPath?` | Regex парсер SQL файла |
+| `save_schema` | `schemaFilePath`, `outputPath?` | Валидация и сохранение схемы из JSON файла |
+| `generate_files` | `schemaFile`, `outputDir`, `templatesDir?`, `presetName?` | Генерация кода из schema.json |
+| `quick_generate` | `sqlFilePath`, `outputDir`, `templatesDir?`, `presetName?` | Парсинг SQL файла + генерация одним вызовом |
+| `list_presets` | `templatesDir?` | Список доступных пресетов шаблонов |
 
 ### MCP Prompts
 
@@ -158,7 +165,7 @@ npx @anthropic/mcp-inspector dotnet run --project SqlGenerator.Mcp
 **Простой SQL (regex парсер):**
 ```
 User: "Сгенерируй код из этого SQL"
-Agent → quick_generate(sql, outputDir, templatesDir)
+Agent → quick_generate(sqlFilePath, outputDir, templatesDir)
 ```
 
 **Сложный SQL (агент парсит сам):**
@@ -167,8 +174,9 @@ User: "Распарси этот SQL с комментариями"
 Agent:
   1. Запрашивает prompt: sql_parsing_instructions(sql)
   2. Парсит SQL самостоятельно по инструкциям
-  3. → save_schema(jsonResult, "schema.json")
-  4. → generate_files("schema.json", outputDir)
+  3. Записывает JSON результат в файл
+  4. → save_schema(schemaFilePath, "schema.json")
+  5. → generate_files("schema.json", outputDir)
 ```
 
 ### Формат JSON схемы

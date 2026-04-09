@@ -24,10 +24,10 @@ namespace SQLFileGenerator
             var tables = new List<TableSchema>();
 
             // Регулярное выражение для поиска CREATE TABLE блоков
-            var tableRegex = new Regex(@"CREATE\s+TABLE\s+(\w+)\s*\((.+?)\);", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            var tableRegex = new Regex(@"CREATE\s+TABLE\s+([\w.]+)\s*\((.+?)\);", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             // Регулярное выражение для ALTER TABLE FK
-            var alterTableFkRegex = new Regex(@"ALTER\s+TABLE\s+(\w+)\s+ADD\s+CONSTRAINT\s+(\w+)\s+FOREIGN\s+KEY\s+\((\w+)\)\s+REFERENCES\s+(\w+)(?:\s*\((\w+)\))?;",
+            var alterTableFkRegex = new Regex(@"ALTER\s+TABLE\s+([\w.]+)\s+ADD\s+CONSTRAINT\s+(\w+)\s+FOREIGN\s+KEY\s+\((\w+)\)\s+REFERENCES\s+([\w.]+)(?:\s*\((\w+)\))?;",
                                            RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             var tableDict = new Dictionary<string, TableSchema>(StringComparer.OrdinalIgnoreCase);
@@ -148,7 +148,7 @@ namespace SQLFileGenerator
             var isPrimaryKey = upperDefinition.Contains("PRIMARY KEY");
 
             // Обрабатываем REFERENCES
-            var referencesMatch = Regex.Match(columnDefinition, @"REFERENCES\s+(\w+)(?:\s*\((\w+)\))?", RegexOptions.IgnoreCase);
+            var referencesMatch = Regex.Match(columnDefinition, @"REFERENCES\s+([\w.]+)(?:\s*\((\w+)\))?", RegexOptions.IgnoreCase);
             var isForeignKey = referencesMatch.Success;
 
             var csharpType = MapPostgresToCSharpType(dataType);
@@ -235,6 +235,11 @@ namespace SQLFileGenerator
         private static string ToPascalCase(string input)
         {
             if (string.IsNullOrEmpty(input)) return input;
+
+            // Strip schema prefix if present (e.g., "org.ref_legal_form" -> "ref_legal_form")
+            var dotIndex = input.LastIndexOf('.');
+            if (dotIndex >= 0 && dotIndex < input.Length - 1)
+                input = input.Substring(dotIndex + 1);
 
             var words = input.Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries)
                             .Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower());

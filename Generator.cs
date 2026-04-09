@@ -21,7 +21,7 @@ namespace SQLFileGenerator
                 return input;
 
             // Разбиваем строку по пробелам, дефисам и подчёркиваниям
-            var words = input.Split(new char[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+            var words = input.Split(new char[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries);
             var sb = new StringBuilder();
 
             foreach (var word in words)
@@ -64,7 +64,7 @@ namespace SQLFileGenerator
                 return input;
 
             // Разбиваем строку по пробелам, дефисам и подчёркиваниям, приводим каждое слово к нижнему регистру
-            var words = input.Split(new char[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
+            var words = input.Split(new char[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries)
                              .Select(w => w.ToLower());
             return string.Join("_", words);
         }

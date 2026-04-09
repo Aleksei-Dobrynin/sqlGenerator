@@ -13,15 +13,26 @@ public class SqlGeneratorTools
     /// Parses SQL using regex (fast, for simple DDL)
     /// </summary>
     [McpServerTool]
-    [Description("Parse PostgreSQL CREATE TABLE SQL using regex parser. Fast but works only for simple DDL. For complex SQL with comments, constraints, or non-standard syntax - parse it yourself using the 'sql_parsing_instructions' prompt and call 'save_schema' with results.")]
+    [Description("Parse PostgreSQL CREATE TABLE SQL file using regex parser. Fast but works only for simple DDL. For complex SQL with comments, constraints, or non-standard syntax - parse it yourself using the 'sql_parsing_instructions' prompt and call 'save_schema' with results.")]
     public ParseSqlResult ParseSql(
-        [Description("SQL script containing CREATE TABLE statements")]
-        string sql,
+        [Description("Path to .sql file containing CREATE TABLE statements")]
+        string sqlFilePath,
         [Description("Output path for schema JSON file. Default: 'schema.json'")]
         string outputPath = "schema.json")
     {
         try
         {
+            var fullSqlPath = Path.GetFullPath(sqlFilePath);
+            if (!File.Exists(fullSqlPath))
+            {
+                return new ParseSqlResult
+                {
+                    Success = false,
+                    Error = $"SQL file not found: {fullSqlPath}"
+                };
+            }
+
+            var sql = File.ReadAllText(fullSqlPath);
             var tables = SqlParser.ParsePostgresCreateTableScript(sql);
 
             if (tables.Count == 0)
@@ -60,16 +71,27 @@ public class SqlGeneratorTools
     /// Saves schema parsed by the agent
     /// </summary>
     [McpServerTool]
-    [Description("Save table schema that you parsed from SQL. Use this after parsing complex SQL yourself following 'sql_parsing_instructions' prompt.")]
+    [Description("Validate and save table schema from a JSON file. Use this after parsing complex SQL yourself following 'sql_parsing_instructions' prompt. Write JSON to a file first, then pass the file path.")]
     public SaveSchemaResult SaveSchema(
-        [Description("JSON array of table schemas. Each table: {\"TableName\": \"users\", \"EntityName\": \"User\", \"Columns\": [{\"Name\": \"id\", \"CSharpType\": \"int\", \"IsPrimaryKey\": true, \"IsForeignKey\": false, \"IsNullable\": false}], \"ForeignKeys\": []}")]
-        string schemaJson,
-        [Description("Output path for schema JSON file. Default: 'schema.json'")]
+        [Description("Path to JSON file containing array of table schemas")]
+        string schemaFilePath,
+        [Description("Output path for validated schema JSON file. Default: 'schema.json'")]
         string outputPath = "schema.json")
     {
         try
         {
+            var fullSchemaPath = Path.GetFullPath(schemaFilePath);
+            if (!File.Exists(fullSchemaPath))
+            {
+                return new SaveSchemaResult
+                {
+                    Success = false,
+                    Error = $"Schema file not found: {fullSchemaPath}"
+                };
+            }
+
             // Validate JSON
+            var schemaJson = File.ReadAllText(fullSchemaPath);
             var tables = JsonSerializer.Deserialize<List<TableSchema>>(schemaJson, JsonOptions);
 
             if (tables == null || tables.Count == 0)
@@ -209,10 +231,10 @@ public class SqlGeneratorTools
     /// Quick generation: parse SQL + generate files in one call
     /// </summary>
     [McpServerTool]
-    [Description("Quick generation: parse SQL with regex and generate files in one call. For simple DDL only. Use 'list_presets' to see available template presets.")]
+    [Description("Quick generation: read SQL file, parse with regex, and generate files in one call. For simple DDL only. Use 'list_presets' to see available template presets.")]
     public GenerateFilesResult QuickGenerate(
-        [Description("SQL script with CREATE TABLE statements")]
-        string sql,
+        [Description("Path to .sql file with CREATE TABLE statements")]
+        string sqlFilePath,
         [Description("Output directory for generated files")]
         string outputDir,
         [Description("Templates directory. Default: 'templates'")]
@@ -222,8 +244,13 @@ public class SqlGeneratorTools
     {
         try
         {
+            var fullSqlPath = Path.GetFullPath(sqlFilePath);
+            if (!File.Exists(fullSqlPath))
+                return Fail($"SQL file not found: {fullSqlPath}");
+
+            var sql = File.ReadAllText(fullSqlPath);
             if (string.IsNullOrWhiteSpace(sql))
-                return Fail("SQL script is required");
+                return Fail("SQL file is empty");
 
             var templatesPath = ResolveTemplatesPath(templatesDir, presetName, out string? resolveError);
             if (resolveError != null)

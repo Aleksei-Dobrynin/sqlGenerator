@@ -136,7 +136,7 @@ Output JSON:
 
 ## After Parsing
 
-After you parse the SQL, call the `save_schema` tool with the JSON result to save it.
+After you parse the SQL, write the JSON result to a file (e.g. `schema.json`), then call the `save_schema` tool with the file path to validate and save it.
 Then use `generate_files` to generate code from the schema.
 ";
 

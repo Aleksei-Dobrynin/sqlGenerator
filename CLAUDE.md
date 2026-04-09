@@ -105,14 +105,21 @@ dotnet build
 npx @anthropic/mcp-inspector dotnet run --project SqlGenerator.Mcp
 ```
 
+### Token Economy Principle
+
+MCP tools accept ONLY file paths, never file content. The MCP server reads/writes files directly on disk. Agents pass only paths. This minimizes context window usage and prevents quality degradation on large schemas.
+
+See [`agent-spec.md`](agent-spec.md) for full agent integration specification.
+
 ### MCP Tools
 
-| Tool | Description |
-|------|-------------|
-| `parse_sql` | Regex parser for simple DDL. Returns schema file path |
-| `save_schema` | Save agent-parsed schema JSON |
-| `generate_files` | Generate code from schema.json file |
-| `quick_generate` | Parse + generate in one call (regex only) |
+| Tool | Params | Description |
+|------|--------|-------------|
+| `parse_sql` | `sqlFilePath`, `outputPath?` | Parse SQL file with regex. Returns schema file path |
+| `save_schema` | `schemaFilePath`, `outputPath?` | Validate agent-parsed schema from JSON file |
+| `generate_files` | `schemaFile`, `outputDir`, `templatesDir?`, `presetName?` | Generate code from schema.json file |
+| `quick_generate` | `sqlFilePath`, `outputDir`, `templatesDir?`, `presetName?` | Parse SQL file + generate in one call (regex only) |
+| `list_presets` | `templatesDir?` | List available template presets |
 
 ### MCP Prompts
 
@@ -124,7 +131,7 @@ npx @anthropic/mcp-inspector dotnet run --project SqlGenerator.Mcp
 
 **Simple SQL (regex):**
 ```
-Agent → quick_generate(sql, outputDir, templatesDir)
+Agent → quick_generate(sqlFilePath, outputDir, templatesDir)
 ```
 
 **Complex SQL (agent parses):**
@@ -132,8 +139,9 @@ Agent → quick_generate(sql, outputDir, templatesDir)
 Agent:
   1. Get prompt: sql_parsing_instructions(sql)
   2. Parse SQL following instructions
-  3. → save_schema(jsonResult, "schema.json")
-  4. → generate_files("schema.json", outputDir, templatesDir)
+  3. Write JSON result to file
+  4. → save_schema(schemaFilePath, "schema.json")
+  5. → generate_files("schema.json", outputDir, templatesDir)
 ```
 
 ### Schema JSON Format
