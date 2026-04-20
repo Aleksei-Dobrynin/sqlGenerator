@@ -1,0 +1,75 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  needs_check_required = false
+  needs_check_id = false
+  for col in dto_columns
+    if !col.is_nullable && col.csharp_type != "bool" && !col.is_foreign_key
+      needs_check_required = true
+    end
+    if col.is_foreign_key && !col.is_nullable
+      needs_check_id = true
+    end
+  end
+
+  entity_camel = entity_name | to_camel_case
+~}}
+import { {{ if needs_check_required }}checkRequired{{ if needs_check_id }}, {{ end }}{{ end }}{{ if needs_check_id }}checkId{{ end }} } from '@/helpers/ValidationHelper';
+import i18n from 'i18next';
+import type {{ entity_name }}FormStore from './store';
+
+export const validate = (fieldName: string, store: {{ entity_name }}FormStore): boolean => {
+  const isAll = fieldName === '_all';
+  let isValid = true;
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "bool" ~}}
+{{~   else if col.is_foreign_key && !col.is_nullable ~}}
+
+  if (isAll || fieldName === '{{ col.name | to_camel_case }}') {
+    if (!checkId(store.{{ col.name | to_camel_case }})) {
+      store.errors['{{ col.name | to_camel_case }}'] = i18n.t('message:error.chooseValue');
+      isValid = false;
+    } else {
+      delete store.errors['{{ col.name | to_camel_case }}'];
+    }
+  }
+{{~   else if col.csharp_type == "DateTime" && !col.is_nullable ~}}
+
+  if (isAll || fieldName === '{{ col.name | to_camel_case }}') {
+    if (!checkRequired(store.{{ col.name | to_camel_case }}?.format('YYYY-MM-DD'))) {
+      store.errors['{{ col.name | to_camel_case }}'] = i18n.t('message:error.fieldRequired');
+      isValid = false;
+    } else {
+      delete store.errors['{{ col.name | to_camel_case }}'];
+    }
+  }
+{{~   else if !col.is_nullable && col.csharp_type == "string" ~}}
+
+  if (isAll || fieldName === '{{ col.name | to_camel_case }}') {
+    if (!checkRequired(store.{{ col.name | to_camel_case }})) {
+      store.errors['{{ col.name | to_camel_case }}'] = i18n.t('message:error.fieldRequired');
+      isValid = false;
+    } else {
+      delete store.errors['{{ col.name | to_camel_case }}'];
+    }
+  }
+{{~   else if !col.is_nullable && (col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal") ~}}
+
+  if (isAll || fieldName === '{{ col.name | to_camel_case }}') {
+    if (!checkRequired(store.{{ col.name | to_camel_case }})) {
+      store.errors['{{ col.name | to_camel_case }}'] = i18n.t('message:error.fieldRequired');
+      isValid = false;
+    } else {
+      delete store.errors['{{ col.name | to_camel_case }}'];
+    }
+  }
+{{~   end ~}}
+{{~ end ~}}
+
+  return isValid;
+};

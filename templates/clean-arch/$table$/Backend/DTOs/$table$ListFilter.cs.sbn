@@ -1,0 +1,28 @@
+{{~
+  has_is_active = false
+  for col in columns
+    if col.name == "IsActive"
+      has_is_active = true
+      break
+    end
+  end
+~}}
+using Template_v1.Application.DTOs.Common;
+
+namespace Template_v1.Application.DTOs;
+
+public class {{ entity_name }}ListFilter : PagedRequest
+{
+    public string? Search { get; set; }
+{{~ if has_is_active ~}}
+    public bool? IsActive { get; set; }
+{{~ end ~}}
+{{~ for fk in foreign_keys ~}}
+    public {{ fk.csharp_type }}? {{ fk.column_name | to_pascal_case }} { get; set; }
+{{~ end ~}}
+
+    // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+    public {{ vfk.csharp_type }}? {{ vfk.column_name | to_pascal_case }} { get; set; }
+{{~ end ~}}
+}

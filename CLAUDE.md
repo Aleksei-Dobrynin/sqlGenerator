@@ -18,6 +18,10 @@ dotnet run -- --use-llm --output ./generated
 
 # Full options
 dotnet run -- --use-llm --config appsettings.json --sql sql/script.sql --output result
+
+# Virtual foreign keys are enabled by default. To disable:
+dotnet run -- --no-virtual-fks
+dotnet run -- --no-virtual-fks --output ./generated
 ```
 
 ## Project Overview
@@ -32,6 +36,7 @@ SQL-to-Entity Generator is a .NET 9.0 CLI tool that parses PostgreSQL `CREATE TA
 - **Parser.cs** (`SqlParser`) - Parses PostgreSQL DDL using regex. Extracts tables, columns, primary/foreign keys from `CREATE TABLE` and `ALTER TABLE` statements. Maps PostgreSQL types to C# types.
 - **Generator.cs** (`FileGenerator`) - Processes Scriban templates. Walks `templates/` directory, replaces `$table$` placeholder in paths/filenames with entity name, renders `.sbn` templates with table schema context.
 - **Structures.cs** - Data models: `TableSchema`, `ColumnSchema`, `ForeignKeyInfo`
+- **VirtualForeignKeyResolver.cs** - Post-processor that infers virtual FK relationships from column naming conventions (`*_id`, `id_*`, `id*` patterns). Matches candidates against parsed table names with pluralization support.
 
 ### LLM Parser (`LlmParser/`)
 
@@ -70,6 +75,8 @@ Available template variables:
 - `foreign_keys` - Foreign key relationships
 - `primary_key` - Primary key column info
 - `all_tables` - All parsed tables (for cross-table relationships)
+- `virtual_foreign_keys` - Virtual FK relationships inferred from naming conventions (enabled by default, disable with `--no-virtual-fks`)
+- `virtual_all_tables` - All tables with combined real + virtual FKs (for cross-table relationships including inferred ones)
 
 Helper functions: `map_type`, `to_pascal_case`, `to_camel_case`, `to_snake_case`, `remove_id_suffix`
 
@@ -115,10 +122,10 @@ See [`agent-spec.md`](agent-spec.md) for full agent integration specification.
 
 | Tool | Params | Description |
 |------|--------|-------------|
-| `parse_sql` | `sqlFilePath`, `outputPath?` | Parse SQL file with regex. Returns schema file path |
+| `parse_sql` | `sqlFilePath`, `outputPath?`, `includeVirtualFks?` | Parse SQL file with regex. Returns schema file path |
 | `save_schema` | `schemaFilePath`, `outputPath?` | Validate agent-parsed schema from JSON file |
-| `generate_files` | `schemaFile`, `outputDir`, `templatesDir?`, `presetName?` | Generate code from schema.json file |
-| `quick_generate` | `sqlFilePath`, `outputDir`, `templatesDir?`, `presetName?` | Parse SQL file + generate in one call (regex only) |
+| `generate_files` | `schemaFile`, `outputDir`, `templatesDir?`, `presetName?`, `includeVirtualFks?` | Generate code from schema.json file |
+| `quick_generate` | `sqlFilePath`, `outputDir`, `templatesDir?`, `presetName?`, `includeVirtualFks?` | Parse SQL file + generate in one call (regex only) |
 | `list_presets` | `templatesDir?` | List available template presets |
 
 ### MCP Prompts
@@ -156,10 +163,15 @@ Agent:
     ],
     "ForeignKeys": [
       {"ColumnName": "role_id", "CSharpType": "int", "ReferencesTable": "roles", "ReferencesColumn": "id"}
+    ],
+    "VirtualForeignKeys": [
+      {"ColumnName": "dept_id", "CSharpType": "int", "ReferencesTable": "departments", "ReferencesColumn": "id"}
     ]
   }
 ]
 ```
+
+`VirtualForeignKeys` - inferred from naming conventions (`*_id`, `id_*`, `id*`), populated by default (disable with `--no-virtual-fks`).
 
 ### Claude Desktop Configuration
 

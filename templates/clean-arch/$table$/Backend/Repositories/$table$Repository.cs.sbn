@@ -1,0 +1,287 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_is_active = false
+  has_is_deleted = false
+  has_audit = false
+  has_tenant = false
+  for col in columns
+    if col.name == "IsActive"
+      has_is_active = true
+    end
+    if col.name == "IsDeleted"
+      has_is_deleted = true
+    end
+    if col.name == "CreatedAt"
+      has_audit = true
+    end
+    if col.name == "TenantId"
+      has_tenant = true
+    end
+  end
+
+  # Build non-PK columns for INSERT
+  insert_columns = []
+  for col in columns
+    if !col.is_primary_key
+      insert_columns = insert_columns | array.add col
+    end
+  end
+
+  # Build columns for UPDATE (editable + is_active + audit updated)
+  update_columns = []
+  for col in dto_columns
+    update_columns = update_columns | array.add col
+  end
+~}}
+using Dapper;
+using Template_v1.Application.DTOs;
+using Template_v1.Application.DTOs.Common;
+using Template_v1.Application.Interfaces;
+using Template_v1.Domain.Entities;
+using static Template_v1.Infrastructure.Persistence.Helpers.SqlI18n;
+
+namespace Template_v1.Infrastructure.Persistence.Repositories;
+
+public class {{ entity_name }}Repository : I{{ entity_name }}Repository
+{
+    // ═══════════════════════════════════════════════════════════
+    // Entity operations
+    // ═══════════════════════════════════════════════════════════
+
+    public async Task<{{ entity_name }}?> GetEntityById(int id, int tenantId, IUnitOfWork uow)
+    {
+        var row = await uow.Connection.QueryFirstOrDefaultAsync(
+            @"SELECT
+{{~ for col in columns ~}}
+                t.{{ col.name | to_snake_case }} AS {{ col.name }}{{~ if !for.last ~}},{{~ end ~}}
+{{~ end ~}}
+              FROM {{ table_name }} t
+              WHERE t.id = @Id AND t.tenant_id = @TenantId",
+            new { Id = id, TenantId = tenantId },
+            uow.Transaction);
+
+        if (row == null) return null;
+
+        return {{ entity_name }}.Reconstitute(
+{{~ for col in columns ~}}
+            {{ col.name | to_camel_case }}: row.{{ col.name }}{{~ if !for.last ~}},{{~ end ~}}
+{{~ end ~}});
+    }
+
+    public async Task<int> Create({{ entity_name }} entity, IUnitOfWork uow)
+    {
+        return await uow.Connection.ExecuteScalarAsync<int>(
+            @"INSERT INTO {{ table_name }}
+                ({{~ for col in insert_columns ~}}{{ col.name | to_snake_case }}{{~ if !for.last ~}}, {{~ end ~}}{{~ end ~}})
+              VALUES
+                ({{~ for col in insert_columns ~}}@{{ col.name }}{{~ if !for.last ~}}, {{~ end ~}}{{~ end ~}})
+              RETURNING id",
+            new
+            {
+{{~ for col in insert_columns ~}}
+                entity.{{ col.name }}{{~ if !for.last ~}},{{~ end ~}}
+{{~ end ~}}
+            },
+            uow.Transaction);
+    }
+
+    public async Task Update({{ entity_name }} entity, IUnitOfWork uow)
+    {
+        await uow.Connection.ExecuteAsync(
+            @"UPDATE {{ table_name }}
+              SET
+{{~ for col in update_columns ~}}
+                  {{ col.name | to_snake_case }} = @{{ col.name }},
+{{~ end ~}}
+{{~ if has_is_active ~}}
+                  is_active = @IsActive,
+{{~ end ~}}
+{{~ if has_audit ~}}
+                  updated_at = @UpdatedAt,
+                  updated_by = @UpdatedBy
+{{~ end ~}}
+              WHERE id = @Id AND tenant_id = @TenantId",
+            new
+            {
+                entity.Id,
+                entity.TenantId,
+{{~ for col in update_columns ~}}
+                entity.{{ col.name }},
+{{~ end ~}}
+{{~ if has_is_active ~}}
+                entity.IsActive,
+{{~ end ~}}
+{{~ if has_audit ~}}
+                entity.UpdatedAt,
+                entity.UpdatedBy
+{{~ end ~}}
+            },
+            uow.Transaction);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DTO query operations
+    // ═══════════════════════════════════════════════════════════
+
+    public async Task<{{ entity_name }}DetailDto?> GetById(int id, int tenantId, string lang, IUnitOfWork uow)
+    {
+        return await uow.Connection.QueryFirstOrDefaultAsync<{{ entity_name }}DetailDto>(
+            $@"SELECT
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+                t.{{ col.name | to_snake_case }} AS {{ col.name }},
+                -- TODO: Замените на корректный JOIN для {{ col.name }}
+                -- {Field("fk_alias")} AS {{ col.name | string.replace "Id" "" }}DisplayName,
+{{~   else ~}}
+                t.{{ col.name | to_snake_case }} AS {{ col.name }},
+{{~   end ~}}
+{{~ end ~}}
+{{~ if has_is_active ~}}
+                t.is_active AS IsActive,
+{{~ end ~}}
+{{~ if has_audit ~}}
+                t.created_at AS CreatedAt,
+                t.updated_at AS UpdatedAt,
+{{~ end ~}}
+                t.id
+              FROM {{ table_name }} t
+{{~ for fk in foreign_keys ~}}
+              -- TODO: LEFT JOIN {{ fk.references_table }} fk_{{ for.index }} ON fk_{{ for.index }}.id = t.{{ fk.column_name | to_snake_case }}
+{{~ end ~}}
+              -- ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+              -- TODO: LEFT JOIN {{ vfk.references_table }} vfk_{{ for.index }} ON vfk_{{ for.index }}.id = t.{{ vfk.column_name | to_snake_case }}
+{{~ end ~}}
+              WHERE t.id = @Id AND t.tenant_id = @TenantId",
+            new { Id = id, TenantId = tenantId, Lang = lang },
+            uow.Transaction);
+    }
+
+    public async Task<PagedResponse<{{ entity_name }}ListDto>> GetList({{ entity_name }}ListFilter filter, int tenantId, string lang, IUnitOfWork uow)
+    {
+        var p = new DynamicParameters();
+        p.Add("TenantId", tenantId);
+        p.Add("Lang", lang);
+
+        var conditions = new List<string> { "t.tenant_id = @TenantId" };
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            conditions.Add("(t.name ILIKE '%' || @Search || '%')"); // TODO: Настройте поля для поиска
+            p.Add("Search", filter.Search);
+        }
+{{~ if has_is_active ~}}
+        if (filter.IsActive.HasValue)
+        {
+            conditions.Add("t.is_active = @IsActive");
+            p.Add("IsActive", filter.IsActive.Value);
+        }
+{{~ end ~}}
+{{~ for fk in foreign_keys ~}}
+        if (filter.{{ fk.column_name | to_pascal_case }}.HasValue)
+        {
+            conditions.Add("t.{{ fk.column_name | to_snake_case }} = @Filter{{ fk.column_name | to_pascal_case }}");
+            p.Add("Filter{{ fk.column_name | to_pascal_case }}", filter.{{ fk.column_name | to_pascal_case }}.Value);
+        }
+{{~ end ~}}
+
+        // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+        if (filter.{{ vfk.column_name | to_pascal_case }}.HasValue)
+        {
+            conditions.Add("t.{{ vfk.column_name | to_snake_case }} = @Filter{{ vfk.column_name | to_pascal_case }}");
+            p.Add("Filter{{ vfk.column_name | to_pascal_case }}", filter.{{ vfk.column_name | to_pascal_case }}.Value);
+        }
+{{~ end ~}}
+
+        var where = "WHERE " + string.Join(" AND ", conditions);
+
+        var total = await uow.Connection.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM {{ table_name }} t {where}", p, uow.Transaction);
+
+        var offset = (filter.Page - 1) * filter.PageSize;
+        p.Add("PageSize", filter.PageSize);
+        p.Add("Offset", offset);
+
+        var items = (await uow.Connection.QueryAsync<{{ entity_name }}ListDto>(
+            $@"SELECT
+                t.id,
+{{~ for col in dto_columns ~}}
+                t.{{ col.name | to_snake_case }} AS {{ col.name }},
+{{~   if col.is_foreign_key ~}}
+                -- TODO: JOIN для {{ col.name | string.replace "Id" "" }}DisplayName
+{{~   end ~}}
+{{~ end ~}}
+{{~ if has_is_active ~}}
+                t.is_active AS IsActive
+{{~ end ~}}
+              FROM {{ table_name }} t
+{{~ for fk in foreign_keys ~}}
+              -- TODO: LEFT JOIN {{ fk.references_table }} fk_{{ for.index }} ON fk_{{ for.index }}.id = t.{{ fk.column_name | to_snake_case }}
+{{~ end ~}}
+              -- ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+              -- TODO: LEFT JOIN {{ vfk.references_table }} vfk_{{ for.index }} ON vfk_{{ for.index }}.id = t.{{ vfk.column_name | to_snake_case }}
+{{~ end ~}}
+              {where}
+              ORDER BY t.id
+              LIMIT @PageSize OFFSET @Offset", p, uow.Transaction)).ToList();
+
+        return new PagedResponse<{{ entity_name }}ListDto>
+        {
+            Items = items,
+            Total = total,
+            Page = filter.Page
+        };
+    }
+
+{{~ for fk in foreign_keys ~}}
+    public async Task<List<{{ entity_name }}ListDto>> GetBy{{ fk.column_name | to_pascal_case | string.replace "Id" "" }}({{ fk.csharp_type }} {{ fk.column_name | to_camel_case }}, int tenantId, IUnitOfWork uow)
+    {
+        return (await uow.Connection.QueryAsync<{{ entity_name }}ListDto>(
+            @"SELECT
+                t.id,
+{{~ for col in dto_columns ~}}
+                t.{{ col.name | to_snake_case }} AS {{ col.name }},
+{{~ end ~}}
+{{~ if has_is_active ~}}
+                t.is_active AS IsActive
+{{~ end ~}}
+              FROM {{ table_name }} t
+              WHERE t.{{ fk.column_name | to_snake_case }} = @FkValue AND t.tenant_id = @TenantId
+              ORDER BY t.id",
+            new { FkValue = {{ fk.column_name | to_camel_case }}, TenantId = tenantId },
+            uow.Transaction)).ToList();
+    }
+
+{{~ end ~}}
+
+    // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+
+{{~ for vfk in virtual_foreign_keys ~}}
+    public async Task<List<{{ entity_name }}ListDto>> GetBy{{ vfk.column_name | to_pascal_case | string.replace "Id" "" }}({{ vfk.csharp_type }} {{ vfk.column_name | to_camel_case }}, int tenantId, IUnitOfWork uow)
+    {
+        return (await uow.Connection.QueryAsync<{{ entity_name }}ListDto>(
+            @"SELECT
+                t.id,
+{{~ for col in dto_columns ~}}
+                t.{{ col.name | to_snake_case }} AS {{ col.name }},
+{{~ end ~}}
+{{~ if has_is_active ~}}
+                t.is_active AS IsActive
+{{~ end ~}}
+              FROM {{ table_name }} t
+              WHERE t.{{ vfk.column_name | to_snake_case }} = @FkValue AND t.tenant_id = @TenantId
+              ORDER BY t.id",
+            new { FkValue = {{ vfk.column_name | to_camel_case }}, TenantId = tenantId },
+            uow.Transaction)).ToList();
+    }
+
+{{~ end ~}}
+}

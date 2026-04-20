@@ -100,11 +100,11 @@ namespace SQLFileGenerator
         /// <param name="tables">Список таблиц, для которых будут сгенерированы файлы</param>
         /// <param name="templatesDir">Путь к директории с шаблонами</param>
         /// <param name="resultDir">Путь к директории для сохранения результатов</param>
-        public static void GenerateOtherFiles(List<TableSchema> tables, string templatesDir, string resultDir)
+        public static void GenerateOtherFiles(List<TableSchema> tables, string templatesDir, string resultDir, bool includeVirtualFks = true)
         {
             foreach (var table in tables)
             {
-                ProcessTemplatesDirectory(templatesDir, resultDir, table, tables);
+                ProcessTemplatesDirectory(templatesDir, resultDir, table, tables, includeVirtualFks);
             }
         }
 
@@ -179,6 +179,24 @@ namespace SQLFileGenerator
         }
 
         /// <summary>
+        /// Создает представление таблицы для virtual_all_tables с объединёнными real + virtual FK
+        /// </summary>
+        private static Dictionary<string, object> CreateVirtualTableData(TableSchema table)
+        {
+            var combinedFks = table.ForeignKeys
+                .Concat(table.VirtualForeignKeys)
+                .Select(fk => CreateForeignKeyData(fk))
+                .ToArray();
+
+            return new Dictionary<string, object>
+            {
+                ["entity_name"] = table.EntityName,
+                ["table_name"] = table.TableName,
+                ["foreign_keys"] = combinedFks
+            };
+        }
+
+        /// <summary>
         /// Обрабатывает директорию с шаблонами для конкретной таблицы.
         /// Сканирует все файлы в директории, применяет к ним шаблонизацию
         /// и сохраняет результаты в указанную директорию.
@@ -188,7 +206,7 @@ namespace SQLFileGenerator
         /// <param name="resultDir">Путь к директории для сохранения результатов</param>
         /// <param name="table">Информация о таблице для шаблонизации</param>
         /// <param name="allTables">Все таблицы схемы для поддержки master-detail шаблонов</param>
-        public static void ProcessTemplatesDirectory(string templatesDir, string resultDir, TableSchema table, List<TableSchema> allTables)
+        public static void ProcessTemplatesDirectory(string templatesDir, string resultDir, TableSchema table, List<TableSchema> allTables, bool includeVirtualFks = true)
         {
             // Получаем все файлы (независимо от расширения)
             var templateFiles = Directory.GetFiles(templatesDir, "*", SearchOption.AllDirectories);
@@ -304,8 +322,17 @@ namespace SQLFileGenerator
                     scriptObject["primary_key"] = null;
                 }
 
-                // *** НОВОЕ: Добавляем все таблицы для поддержки master-detail паттерна ***
+                // *** Добавляем все таблицы для поддержки master-detail паттерна ***
                 scriptObject["all_tables"] = allTables.Select(t => CreateTableData(t)).ToArray();
+
+                // Virtual FK переменные — всегда присутствуют (пустые если отключено), чтобы шаблоны не падали
+                scriptObject["virtual_foreign_keys"] = includeVirtualFks
+                    ? table.VirtualForeignKeys.Select(fk => CreateForeignKeyData(fk)).ToArray()
+                    : Array.Empty<Dictionary<string, object>>();
+
+                scriptObject["virtual_all_tables"] = includeVirtualFks
+                    ? allTables.Select(t => CreateVirtualTableData(t)).ToArray()
+                    : Array.Empty<Dictionary<string, object>>();
 
                 // Импортируем вспомогательные функции
                 scriptObject.Import("map_type", new Func<string, string>(MapType));

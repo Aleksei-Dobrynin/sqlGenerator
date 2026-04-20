@@ -1,0 +1,88 @@
+{{~
+  entity_camel = entity_name | to_camel_case
+~}}
+import { useEffect, useState } from 'react';
+import { observer } from 'mobx-react';
+import {
+  Box,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  CircularProgress,
+} from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { create{{ entity_name }}FormStore } from './store';
+import {{ entity_name }}AddEditBase from './base';
+import {{ entity_name }}MtmTabs from './mtmTabs';
+
+interface Props {
+  openPanel: boolean;
+  id: number | null;
+  onBtnCancelClick: () => void;
+  onSaveClick: () => void;
+}
+
+const {{ entity_name }}PopupForm = observer(function {{ entity_name }}PopupForm({
+  openPanel,
+  id,
+  onBtnCancelClick,
+  onSaveClick,
+}: Props) {
+  const { t } = useTranslation();
+  const [store] = useState(create{{ entity_name }}FormStore);
+
+  useEffect(() => {
+    if (openPanel) {
+      store.clearStore();
+      store.doLoad(id);
+    }
+  }, [openPanel, id, store]);
+
+  const handleCancel = () => {
+    store.clearStore();
+    onBtnCancelClick();
+  };
+
+  return (
+    <Dialog
+      open={openPanel}
+      onClose={handleCancel}
+      maxWidth="xl"
+      fullWidth
+      data-cy="{{ entity_camel }}-popup-form"
+    >
+      <DialogTitle>
+        {id ? t('label:{{ entity_camel }}.edit{{ entity_name }}') : t('label:{{ entity_camel }}.new{{ entity_name }}')}
+      </DialogTitle>
+      <DialogContent sx={{ '{{' }} pt: 2 {{ '}}' }}>
+        <Box sx={{ '{{' }} display: 'flex', gap: 2 {{ '}}' }}>
+          <Box sx={{ '{{' }} flex: 1, minWidth: 0 {{ '}}' }}>
+            <{{ entity_name }}AddEditBase store={store} />
+          </Box>
+          {store.id && (
+            <Box sx={{ '{{' }} flex: 1, minWidth: 0, borderLeft: 1, borderColor: 'divider', pl: 2 {{ '}}' }}>
+              <{{ entity_name }}MtmTabs {{ entity_camel }}Id={store.id} editMode="popup" orientation="horizontal" />
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleCancel} data-cy="{{ entity_camel }}-popup-cancel-btn">
+          {t('common:cancel')}
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => store.onSaveClick(() => onSaveClick())}
+          disabled={store.isSaving}
+          data-cy="{{ entity_camel }}-popup-save-btn"
+        >
+          {store.isSaving ? <CircularProgress size={20} /> : t('common:save')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+});
+
+export default {{ entity_name }}PopupForm;

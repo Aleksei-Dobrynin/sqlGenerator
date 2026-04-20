@@ -1,0 +1,51 @@
+{{~
+  route_name = entity_name | to_snake_case
+~}}
+using Template_v1.API.Filters;
+using Template_v1.Application.DTOs;
+using Template_v1.Application.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Template_v1.API.Controllers;
+
+[Route("api/{{ route_name }}s")]
+public class {{ entity_name }}Controller : BaseController
+{
+    private readonly I{{ entity_name }}Service _service;
+
+    public {{ entity_name }}Controller(I{{ entity_name }}Service service)
+    {
+        _service = service;
+    }
+
+    [HttpGet]
+    [RequirePermission("{{ route_name }}.read")]
+    public async Task<IActionResult> GetList([FromQuery] {{ entity_name }}ListFilter filter)
+        => Ok(await _service.GetList(filter, TenantId, Lang));
+
+    [HttpGet("{id:int}")]
+    [RequirePermission("{{ route_name }}.read")]
+    public async Task<IActionResult> GetById(int id)
+        => Ok(await _service.GetById(id, TenantId, Lang));
+
+    [HttpPost]
+    [RequirePermission("{{ route_name }}.create")]
+    public async Task<IActionResult> Create([FromBody] Create{{ entity_name }}Dto dto)
+    {
+        var result = await _service.Create(dto, TenantId, UserId, Lang);
+        return StatusCode(201, result);
+    }
+
+    [HttpPut("{id:int}")]
+    [RequirePermission("{{ route_name }}.update")]
+    public async Task<IActionResult> Update(int id, [FromBody] Update{{ entity_name }}Dto dto)
+        => Ok(await _service.Update(id, dto, TenantId, UserId, Lang));
+
+    [HttpDelete("{id:int}")]
+    [RequirePermission("{{ route_name }}.delete")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        await _service.Delete(id, TenantId);
+        return NoContent();
+    }
+}

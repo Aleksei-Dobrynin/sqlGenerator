@@ -54,7 +54,27 @@
 {{ fk.constraint_name }}    - имя ограничения (string)
 ```
 
-### 1.5 Объект primary_key (может быть null)
+### 1.5 Массив virtual_foreign_keys[] — виртуальные внешние ключи
+Структура идентична `foreign_keys[]`. Содержит FK, выведенные из конвенций именования колонок (`*_id`, `id_*`, `id*`).
+Включён по умолчанию (пустой массив при `--no-virtual-fks`).
+```liquid
+{{ vfk.column_name }}        - имя колонки (string)
+{{ vfk.csharp_type }}        - тип C# (string)
+{{ vfk.references_table }}   - имя выведенной связанной таблицы (string)
+{{ vfk.references_column }}  - имя связанной колонки, всегда "id" (string)
+{{ vfk.constraint_name }}    - всегда null (нет реального ограничения)
+```
+
+### 1.6 Массив virtual_all_tables[] — все таблицы с объединёнными FK
+Структура идентична `all_tables[]`. Поле `foreign_keys` содержит объединённые real + virtual FK.
+Включён по умолчанию (пустой массив при `--no-virtual-fks`).
+```liquid
+{{ t.entity_name }}     - PascalCase имя сущности (string)
+{{ t.table_name }}      - имя таблицы (string)
+{{ t.foreign_keys }}    - массив объединённых real + virtual FK
+```
+
+### 1.7 Объект primary_key (может быть null)
 Поддерживает ОБА варианта:
 ```liquid
 {{ primary_key.Name }}       - имя колонки PK (PascalCase версия)

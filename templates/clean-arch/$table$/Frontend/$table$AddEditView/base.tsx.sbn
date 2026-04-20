@@ -1,0 +1,165 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_datetime = false
+  has_fk = false
+  has_bool = false
+  for col in dto_columns
+    if col.csharp_type == "DateTime"; has_datetime = true; end
+    if col.is_foreign_key; has_fk = true; end
+    if col.csharp_type == "bool"; has_bool = true; end
+  end
+
+  entity_camel = entity_name | to_camel_case
+~}}
+import { observer } from 'mobx-react';
+import Grid from '@mui/material/Grid';
+{{~ if has_fk || has_bool ~}}
+import {
+{{~   if has_fk ~}}
+  FormControl,
+  FormHelperText,
+  InputLabel,
+  MenuItem,
+  Select,
+{{~   end ~}}
+{{~   if has_bool ~}}
+  FormControlLabel,
+  Switch,
+{{~   end ~}}
+} from '@mui/material';
+{{~ end ~}}
+import { useTranslation } from 'react-i18next';
+import CustomTextField from '@components/TextField';
+{{~ if has_datetime ~}}
+import DateField from '@components/DateField';
+{{~ end ~}}
+import type {{ entity_name }}FormStore from './store';
+
+interface Props {
+  store: {{ entity_name }}FormStore;
+}
+
+const {{ entity_name }}AddEditBase = observer(function {{ entity_name }}AddEditBase({ store }: Props) {
+  const { t } = useTranslation();
+
+  return (
+    <Grid container spacing={2}>
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+      <Grid size={{ '{{' }} xs: 12, sm: 6 {{ '}}' }}>
+        <FormControl size="small" fullWidth{{ if !col.is_nullable }} error={!!store.errors.{{ col.name | to_camel_case }}}{{ end }}>
+          <InputLabel>{t('label:{{ entity_camel }}.{{ col.name | remove_id_suffix | to_camel_case }}')}</InputLabel>
+          <Select
+            value={store.{{ col.name | to_camel_case }} ?? ''}
+            onChange={(e) => store.handleSelectChange('{{ col.name | to_camel_case }}', e.target.value as number)}
+            label={t('label:{{ entity_camel }}.{{ col.name | remove_id_suffix | to_camel_case }}')}
+            data-cy="{{ entity_camel }}-form-{{ col.name | to_camel_case }}"
+          >
+{{~     if col.is_nullable ~}}
+            <MenuItem value="">{t('common:notSelected')}</MenuItem>
+{{~     end ~}}
+            {store.{{ col.name | remove_id_suffix | to_camel_case }}Refs.map((ref) => (
+              <MenuItem key={ref.id} value={ref.id}>{ref.displayName}</MenuItem>
+            ))}
+          </Select>
+{{~     if !col.is_nullable ~}}
+          {store.errors.{{ col.name | to_camel_case }} && (
+            <FormHelperText>{store.errors.{{ col.name | to_camel_case }}}</FormHelperText>
+          )}
+{{~     end ~}}
+        </FormControl>
+      </Grid>
+{{~   else if col.csharp_type == "bool" ~}}
+      <Grid size={{ '{{' }} xs: 12, sm: 6 {{ '}}' }}>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={store.{{ col.name | to_camel_case }}}
+              onChange={(e) => store.handleChange('{{ col.name | to_camel_case }}', e.target.checked)}
+              data-cy="{{ entity_camel }}-form-{{ col.name | to_camel_case }}"
+            />
+          }
+          label={t('label:{{ entity_camel }}.{{ col.name | to_camel_case }}')}
+        />
+      </Grid>
+{{~   else if col.csharp_type == "DateTime" ~}}
+      <Grid size={{ '{{' }} xs: 12, sm: 6 {{ '}}' }}>
+        <DateField
+          id="{{ col.name | to_camel_case }}"
+          name="{{ col.name | to_camel_case }}"
+          label={t('label:{{ entity_camel }}.{{ col.name | to_camel_case }}')}
+          value={store.{{ col.name | to_camel_case }}}
+          onChange={store.handleChange}
+{{~     if !col.is_nullable ~}}
+          error={!!store.errors.{{ col.name | to_camel_case }}}
+          helperText={store.errors.{{ col.name | to_camel_case }} ?? ''}
+{{~     else ~}}
+          error={false}
+          helperText=""
+{{~     end ~}}
+          dataCy="{{ entity_camel }}-form-{{ col.name | to_camel_case }}"
+        />
+      </Grid>
+{{~   else if col.csharp_type == "string" && !col.is_nullable ~}}
+      <Grid size={{ '{{' }} xs: 12, sm: 6 {{ '}}' }}>
+        <CustomTextField
+          id="{{ col.name | to_camel_case }}"
+          name="{{ col.name | to_camel_case }}"
+          label={t('label:{{ entity_camel }}.{{ col.name | to_camel_case }}')}
+          value={store.{{ col.name | to_camel_case }}}
+          onChange={store.handleChange}
+          error={!!store.errors.{{ col.name | to_camel_case }}}
+          helperText={store.errors.{{ col.name | to_camel_case }}}
+          dataCy="{{ entity_camel }}-form-{{ col.name | to_camel_case }}"
+        />
+      </Grid>
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+      <Grid size={{ '{{' }} xs: 12, sm: 6 {{ '}}' }}>
+        <CustomTextField
+          id="{{ col.name | to_camel_case }}"
+          name="{{ col.name | to_camel_case }}"
+          label={t('label:{{ entity_camel }}.{{ col.name | to_camel_case }}')}
+          value={store.{{ col.name | to_camel_case }} ?? ''}
+          onChange={(name, value) => store.handleChange(name, value || null)}
+          dataCy="{{ entity_camel }}-form-{{ col.name | to_camel_case }}"
+        />
+      </Grid>
+{{~   else if (col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal") && !col.is_nullable ~}}
+      <Grid size={{ '{{' }} xs: 12, sm: 6 {{ '}}' }}>
+        <CustomTextField
+          id="{{ col.name | to_camel_case }}"
+          name="{{ col.name | to_camel_case }}"
+          label={t('label:{{ entity_camel }}.{{ col.name | to_camel_case }}')}
+          value={String(store.{{ col.name | to_camel_case }})}
+          onChange={(name, value) => store.handleChange(name, Number(value) || 0)}
+          type="number"
+          error={!!store.errors.{{ col.name | to_camel_case }}}
+          helperText={store.errors.{{ col.name | to_camel_case }}}
+          dataCy="{{ entity_camel }}-form-{{ col.name | to_camel_case }}"
+        />
+      </Grid>
+{{~   else if (col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal") && col.is_nullable ~}}
+      <Grid size={{ '{{' }} xs: 12, sm: 6 {{ '}}' }}>
+        <CustomTextField
+          id="{{ col.name | to_camel_case }}"
+          name="{{ col.name | to_camel_case }}"
+          label={t('label:{{ entity_camel }}.{{ col.name | to_camel_case }}')}
+          value={store.{{ col.name | to_camel_case }} != null ? String(store.{{ col.name | to_camel_case }}) : ''}
+          onChange={(name, value) => store.handleChange(name, value ? Number(value) : null)}
+          type="number"
+          dataCy="{{ entity_camel }}-form-{{ col.name | to_camel_case }}"
+        />
+      </Grid>
+{{~   end ~}}
+{{~ end ~}}
+    </Grid>
+  );
+});
+
+export default {{ entity_name }}AddEditBase;

@@ -1,0 +1,10 @@
+{{~
+  route_name = entity_name | to_snake_case
+~}}
+import http from '@api/https';
+import type { I{{ entity_name }}DetailDto } from '@constants/DataModels/{{ entity_name }}/{{ entity_name }}Types';
+
+export const get{{ entity_name }} = async (id: number): Promise<I{{ entity_name }}DetailDto> => {
+  const response = await http.http.get<I{{ entity_name }}DetailDto>(`/api/{{ route_name }}s/${id}`);
+  return response.data;
+};

@@ -27,6 +27,7 @@
 |----------|-------------|----------|
 | `sqlFilePath` | да | Путь к `.sql` файлу с `CREATE TABLE` |
 | `outputPath` | нет | Путь для schema JSON (по умолчанию: `schema.json`) |
+| `includeVirtualFks` | нет | Включить виртуальные FK из конвенций именования (по умолчанию: `true`) |
 
 **Возвращает:** `{ success, tableCount, tables[], schemaFile }`
 
@@ -53,6 +54,7 @@
 | `outputDir` | да | Директория для сгенерированных файлов |
 | `templatesDir` | нет | Директория шаблонов (по умолчанию: `templates`) |
 | `presetName` | нет | Имя пресета шаблонов (вызовите `ListPresets` сначала) |
+| `includeVirtualFks` | нет | Включить виртуальные FK из конвенций именования (по умолчанию: `true`) |
 
 **Возвращает:** `{ success, outputDir, tableCount, fileCount }`
 
@@ -66,6 +68,7 @@
 | `outputDir` | да | Директория вывода |
 | `templatesDir` | нет | Директория шаблонов (по умолчанию: `templates`) |
 | `presetName` | нет | Имя пресета шаблонов |
+| `includeVirtualFks` | нет | Включить виртуальные FK из конвенций именования (по умолчанию: `true`) |
 
 **Возвращает:** `{ success, outputDir, tableCount, fileCount }`
 
@@ -137,10 +140,21 @@ Agent -> ParseSql(sqlFilePath) -> GenerateFiles(schemaFile, outputDir, presetNam
         "ReferencesColumn": "id",
         "ConstraintName": null
       }
+    ],
+    "VirtualForeignKeys": [
+      {
+        "ColumnName": "department_id",
+        "CSharpType": "int",
+        "ReferencesTable": "org.departments",
+        "ReferencesColumn": "id",
+        "ConstraintName": null
+      }
     ]
   }
 ]
 ```
+
+**Примечание:** `VirtualForeignKeys` содержит связи, выведенные из конвенций именования колонок (`*_id`, `id_*`, `id*`), когда нет явного `REFERENCES`. Заполняется при `includeVirtualFks: true`.
 
 ## Маппинг типов (PostgreSQL -> C#)
 

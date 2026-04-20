@@ -1,0 +1,13 @@
+using Template_v1.Application.DTOs;
+using Template_v1.Application.DTOs.Common;
+
+namespace Template_v1.Application.Interfaces;
+
+public interface I{{ entity_name }}Service
+{
+    Task<PagedResponse<{{ entity_name }}ListDto>> GetList({{ entity_name }}ListFilter filter, int tenantId, string lang);
+    Task<{{ entity_name }}DetailDto> GetById(int id, int tenantId, string lang);
+    Task<{{ entity_name }}DetailDto> Create(Create{{ entity_name }}Dto dto, int tenantId, int currentUserId, string lang);
+    Task<{{ entity_name }}DetailDto> Update(int id, Update{{ entity_name }}Dto dto, int tenantId, int currentUserId, string lang);
+    Task Delete(int id, int tenantId);
+}

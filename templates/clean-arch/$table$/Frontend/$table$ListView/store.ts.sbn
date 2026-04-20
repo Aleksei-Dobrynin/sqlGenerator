@@ -1,0 +1,197 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_is_active = false
+  for col in columns
+    if col.name == "IsActive"; has_is_active = true; end
+  end
+
+  has_fk = false
+  for col in dto_columns
+    if col.is_foreign_key; has_fk = true; end
+  end
+
+  route_name = entity_name | to_snake_case
+  entity_camel = entity_name | to_camel_case
+
+  first_display_col = null
+  for col in dto_columns
+    if col.csharp_type == "string" && !col.is_foreign_key && first_display_col == null
+      first_display_col = col
+    end
+  end
+~}}
+import { makeAutoObservable, runInAction } from 'mobx';
+import MainStore from '@/MainStore';
+import i18n from 'i18next';
+import { get{{ entity_name }}s } from '@api/{{ entity_name }}/useGet{{ entity_name }}s';
+import { delete{{ entity_name }} } from '@api/{{ entity_name }}/useDelete{{ entity_name }}';
+import type { I{{ entity_name }}ListDto } from '@constants/DataModels/{{ entity_name }}/{{ entity_name }}Types';
+{{~ if has_fk ~}}
+import type { IRefOption } from '@constants/DataModels/Organization/CompanyTypes';
+{{~ end ~}}
+
+class {{ entity_name }}ListStore {
+  data: I{{ entity_name }}ListDto[] = [];
+  total = 0;
+
+  searchField = '';
+  page = 0;
+  pageSize = 25;
+
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+  {{ col.name | to_camel_case }}Filter: number | null = null;
+  {{ col.name | remove_id_suffix | to_camel_case }}Refs: IRefOption[] = [];
+{{~   end ~}}
+{{~ end ~}}
+
+  openPanel = false;
+  currentId: number | null = null;
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  async loadData() {
+    MainStore.changeLoader(true);
+    try {
+      const result = await get{{ entity_name }}s({
+        page: this.page + 1,
+        pageSize: this.pageSize,
+        search: this.searchField || undefined,
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+        {{ col.name | to_camel_case }}: this.{{ col.name | to_camel_case }}Filter ?? undefined,
+{{~   end ~}}
+{{~ end ~}}
+      });
+      runInAction(() => {
+        this.data = result.items;
+        this.total = result.total;
+      });
+    } catch {
+      // error handled by interceptor
+    } finally {
+      MainStore.changeLoader(false);
+    }
+  }
+{{~ if has_fk ~}}
+
+  async loadRefs() {
+    try {
+{{~   for col in dto_columns ~}}
+{{~     if col.is_foreign_key ~}}
+      // TODO: Заменить на реальный API-вызов для {{ col.name | remove_id_suffix }}
+      // const {{ col.name | remove_id_suffix | to_camel_case }}Result = await get{{ col.name | remove_id_suffix }}s(...);
+{{~     end ~}}
+{{~   end ~}}
+      runInAction(() => {
+{{~   for col in dto_columns ~}}
+{{~     if col.is_foreign_key ~}}
+        // this.{{ col.name | remove_id_suffix | to_camel_case }}Refs = {{ col.name | remove_id_suffix | to_camel_case }}Result;
+{{~     end ~}}
+{{~   end ~}}
+      });
+    } catch {
+      // refs load silently
+    }
+  }
+{{~ end ~}}
+
+  changeSearch = (value: string) => {
+    this.searchField = value;
+  };
+
+  onSearchClicked = () => {
+    this.page = 0;
+    this.loadData();
+  };
+
+  clearSearch = () => {
+    this.searchField = '';
+    this.page = 0;
+    this.loadData();
+  };
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+
+  set{{ col.name | remove_id_suffix }}Filter = (id: number | null) => {
+    this.{{ col.name | to_camel_case }}Filter = id;
+    this.page = 0;
+    this.loadData();
+  };
+{{~   end ~}}
+{{~ end ~}}
+
+  setPage = (page: number) => {
+    this.page = page;
+    this.loadData();
+  };
+
+  setPageSize = (size: number) => {
+    this.pageSize = size;
+    this.page = 0;
+    this.loadData();
+  };
+
+  openCreatePanel = () => {
+    this.currentId = null;
+    this.openPanel = true;
+  };
+
+  openEditPanel = (id: number) => {
+    this.currentId = id;
+    this.openPanel = true;
+  };
+
+  closePanel = () => {
+    this.openPanel = false;
+    this.currentId = null;
+  };
+
+  onPanelSaved = () => {
+    this.closePanel();
+    this.loadData();
+  };
+
+  deleteItem = (id: number, name: string) => {
+    MainStore.openConfirmDialog(
+      i18n.t('label:{{ entity_camel }}.deleteConfirm', { name }),
+      async () => {
+        MainStore.closeConfirmDialog();
+        try {
+          await delete{{ entity_name }}(id);
+          MainStore.setSnackbar(i18n.t('message:snackbar.successDelete'), 'success');
+          this.loadData();
+        } catch {
+          // error handled by interceptor
+        }
+      },
+    );
+  };
+
+  clearStore = () => {
+    this.data = [];
+    this.total = 0;
+    this.searchField = '';
+    this.page = 0;
+    this.pageSize = 25;
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+    this.{{ col.name | to_camel_case }}Filter = null;
+    this.{{ col.name | remove_id_suffix | to_camel_case }}Refs = [];
+{{~   end ~}}
+{{~ end ~}}
+    this.openPanel = false;
+    this.currentId = null;
+  };
+}
+
+export const create{{ entity_name }}ListStore = () => new {{ entity_name }}ListStore();
+export default {{ entity_name }}ListStore;

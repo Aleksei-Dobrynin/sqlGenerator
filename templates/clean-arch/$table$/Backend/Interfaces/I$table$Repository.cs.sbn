@@ -1,0 +1,29 @@
+using Template_v1.Application.DTOs;
+using Template_v1.Application.DTOs.Common;
+using Template_v1.Domain.Entities;
+
+namespace Template_v1.Application.Interfaces;
+
+public interface I{{ entity_name }}Repository
+{
+    // ═══════════════════════════════════════════════════════════
+    // Entity operations (для бизнес-логики)
+    // ═══════════════════════════════════════════════════════════
+    Task<{{ entity_name }}?> GetEntityById(int id, int tenantId, IUnitOfWork uow);
+    Task<int> Create({{ entity_name }} entity, IUnitOfWork uow);
+    Task Update({{ entity_name }} entity, IUnitOfWork uow);
+
+    // ═══════════════════════════════════════════════════════════
+    // DTO query operations (для API responses, read-only)
+    // ═══════════════════════════════════════════════════════════
+    Task<{{ entity_name }}DetailDto?> GetById(int id, int tenantId, string lang, IUnitOfWork uow);
+    Task<PagedResponse<{{ entity_name }}ListDto>> GetList({{ entity_name }}ListFilter filter, int tenantId, string lang, IUnitOfWork uow);
+{{~ for fk in foreign_keys ~}}
+    Task<List<{{ entity_name }}ListDto>> GetBy{{ fk.column_name | to_pascal_case | string.replace "Id" "" }}({{ fk.csharp_type }} {{ fk.column_name | to_camel_case }}, int tenantId, IUnitOfWork uow);
+{{~ end ~}}
+
+    // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+    Task<List<{{ entity_name }}ListDto>> GetBy{{ vfk.column_name | to_pascal_case | string.replace "Id" "" }}({{ vfk.csharp_type }} {{ vfk.column_name | to_camel_case }}, int tenantId, IUnitOfWork uow);
+{{~ end ~}}
+}

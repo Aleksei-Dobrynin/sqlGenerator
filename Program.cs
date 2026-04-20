@@ -24,12 +24,14 @@ namespace SqlToEntityGenerator
         ///   --config [path]   Путь к файлу конфигурации (по умолчанию appsettings.json)
         ///   --output [path]   Путь для сохранения результатов
         ///   --sql [path]      Путь к SQL скрипту (по умолчанию sql/script.sql)
+        ///   --no-virtual-fks  Отключить виртуальные FK (включены по умолчанию)
         /// </param>
         static async Task Main(string[] args)
         {
             try
             {
                 var useLlm = args.Contains("--use-llm");
+                var includeVirtualFks = !args.Contains("--no-virtual-fks");
                 var configPath = GetArgValue(args, "--config") ?? "appsettings.json";
                 var sqlScriptPath = GetArgValue(args, "--sql") ?? "sql/script.sql";
 
@@ -42,6 +44,7 @@ namespace SqlToEntityGenerator
                 Console.WriteLine($"SQL script: {sqlScriptPath}");
                 Console.WriteLine($"Templates: {templatesDir}");
                 Console.WriteLine($"Output: {resultDir}");
+                Console.WriteLine($"Virtual FKs: {(includeVirtualFks ? "Enabled" : "Disabled")}");
                 Console.WriteLine();
 
                 if (!File.Exists(sqlScriptPath))
@@ -77,6 +80,12 @@ namespace SqlToEntityGenerator
 
                 Console.WriteLine($"Parsed {tables.Count} table(s) from the SQL script.");
 
+                if (includeVirtualFks)
+                {
+                    VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
+                    Console.WriteLine($"Inferred {tables.Sum(t => t.VirtualForeignKeys.Count)} virtual foreign key(s).");
+                }
+
                 if (!Directory.Exists(templatesDir))
                 {
                     Console.WriteLine($"Templates directory not found at {templatesDir}");
@@ -84,7 +93,7 @@ namespace SqlToEntityGenerator
                 }
 
                 Directory.CreateDirectory(resultDir);
-                FileGenerator.GenerateOtherFiles(tables, templatesDir, resultDir);
+                FileGenerator.GenerateOtherFiles(tables, templatesDir, resultDir, includeVirtualFks);
 
                 Console.WriteLine();
                 Console.WriteLine($"Files successfully generated to: {resultDir}");

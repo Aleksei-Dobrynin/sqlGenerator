@@ -21,6 +21,13 @@ import { get{{ fk.references_table | to_snake_case }}s } from "api/{{ fk.referen
 {{~ end ~}}
 {{~ end ~}}
 
+/* ═══ Virtual Foreign Keys (inferred from naming conventions) ═══ */
+{{~ for vfk in virtual_foreign_keys ~}}
+{{~ if vfk.column_name != (table_name | to_snake_case) + "_id" ~}}
+import { get{{ vfk.references_table | to_snake_case }}s } from "api/{{ vfk.references_table | to_snake_case }}";
+{{~ end ~}}
+{{~ end ~}}
+
 class NewStore {
   // Entity fields
   id = 0;
@@ -45,6 +52,13 @@ class NewStore {
 {{~ for fk in foreign_keys ~}}
 {{~ if fk.column_name != (table_name | to_snake_case) + "_id" ~}}
   {{ fk.column_name | string.replace "_id" "" | to_snake_case }}_list = [];
+{{~ end ~}}
+{{~ end ~}}
+
+  /* ═══ Virtual Foreign Keys (inferred from naming conventions) ═══ */
+{{~ for vfk in virtual_foreign_keys ~}}
+{{~ if vfk.column_name != (table_name | to_snake_case) + "_id" ~}}
+  {{ vfk.column_name | string.replace "_id" "" | to_snake_case }}_list = [];
 {{~ end ~}}
 {{~ end ~}}
 
@@ -116,6 +130,16 @@ class NewStore {
 {{~ end ~}}
 {{~ end ~}}
 
+    /* ═══ Virtual Foreign Keys (inferred from naming conventions) ═══ */
+{{~ for vfk in virtual_foreign_keys ~}}
+{{~ if vfk.column_name == (table_name | to_snake_case) + "_id" ~}}
+    // Virtual: parent ID from list store
+    if (typeof storeList !== 'undefined' && storeList.idMain) {
+      data.{{ vfk.column_name }} = storeList.idMain;
+    }
+{{~ end ~}}
+{{~ end ~}}
+
     const { isValid, errors } = await validate(data);
     if (!isValid) {
       this.errors = errors;
@@ -156,6 +180,13 @@ class NewStore {
 {{~ end ~}}
 {{~ end ~}}
 
+    /* ═══ Virtual Foreign Keys (inferred from naming conventions) ═══ */
+{{~ for vfk in virtual_foreign_keys ~}}
+{{~ if vfk.column_name != (table_name | to_snake_case) + "_id" ~}}
+    await this.load{{ vfk.references_table | to_pascal_case }}List();
+{{~ end ~}}
+{{~ end ~}}
+
     this.id = id;
 
     if (id === null || id === 0) {
@@ -174,6 +205,29 @@ class NewStore {
       if ((response.status === 201 || response.status === 200) && response?.data !== null) {
         runInAction(() => {
           this.{{ fk.column_name | string.replace "_id" "" | to_snake_case }}_list = response.data;
+        });
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      MainStore.setSnackbar(i18n.t("message:somethingWentWrong"), "error");
+    } finally {
+      MainStore.changeLoader(false);
+    }
+  };
+{{~ end ~}}
+{{~ end ~}}
+
+  /* ═══ Virtual Foreign Keys (inferred from naming conventions) ═══ */
+{{~ for vfk in virtual_foreign_keys ~}}
+{{~ if vfk.column_name != (table_name | to_snake_case) + "_id" ~}}
+  load{{ vfk.references_table | to_pascal_case }}List = async () => {
+    try {
+      MainStore.changeLoader(true);
+      const response = await get{{ vfk.references_table | to_snake_case }}s();
+      if ((response.status === 201 || response.status === 200) && response?.data !== null) {
+        runInAction(() => {
+          this.{{ vfk.column_name | string.replace "_id" "" | to_snake_case }}_list = response.data;
         });
       } else {
         throw new Error();

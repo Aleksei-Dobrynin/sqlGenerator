@@ -35,6 +35,7 @@ The tool uses the Scriban templating engine to generate files based on customiza
 - 📋 **Flexible output filename formation.**
 - 🔒 **Processing PRIMARY KEY and FOREIGN KEY constraints** both within `CREATE TABLE` and through `ALTER TABLE`.
 - 🌐 **Support for React component generation** with MUI and other frontend frameworks.
+- 🔗 **Virtual foreign keys** — infer implicit relationships from column naming conventions (`*_id`, `id_*`, `id*`), enabled by default (disable with `--no-virtual-fks`).
 
 ## 🏗️ Project Architecture
 

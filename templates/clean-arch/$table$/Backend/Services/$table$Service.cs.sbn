@@ -1,0 +1,138 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_is_active = false
+  for col in columns
+    if col.name == "IsActive"
+      has_is_active = true
+      break
+    end
+  end
+~}}
+using Template_v1.Application.DTOs;
+using Template_v1.Application.DTOs.Common;
+using Template_v1.Application.Interfaces;
+using Template_v1.Domain.Entities;
+using Template_v1.Domain.Exceptions;
+
+namespace Template_v1.Application.Services;
+
+public class {{ entity_name }}Service : I{{ entity_name }}Service
+{
+    private readonly I{{ entity_name }}Repository _repo;
+    private readonly IUnitOfWork _uow;
+
+    public {{ entity_name }}Service(I{{ entity_name }}Repository repo, IUnitOfWork uow)
+    {
+        _repo = repo;
+        _uow = uow;
+    }
+
+    public async Task<PagedResponse<{{ entity_name }}ListDto>> GetList({{ entity_name }}ListFilter filter, int tenantId, string lang)
+    {
+        await _uow.BeginAsync();
+        try
+        {
+            return await _repo.GetList(filter, tenantId, lang, _uow);
+        }
+        finally
+        {
+            await _uow.RollbackAsync();
+        }
+    }
+
+    public async Task<{{ entity_name }}DetailDto> GetById(int id, int tenantId, string lang)
+    {
+        await _uow.BeginAsync();
+        try
+        {
+            return await _repo.GetById(id, tenantId, lang, _uow)
+                   ?? throw new EntityNotFoundException("{{ entity_name }}", id);
+        }
+        finally
+        {
+            await _uow.RollbackAsync();
+        }
+    }
+
+    public async Task<{{ entity_name }}DetailDto> Create(Create{{ entity_name }}Dto dto, int tenantId, int currentUserId, string lang)
+    {
+        // TODO: Добавьте бизнес-правила перед Create если нужно
+        int id;
+        await _uow.BeginAsync();
+        try
+        {
+            var entity = {{ entity_name }}.Create(
+                tenantId: tenantId,
+{{~ for col in dto_columns ~}}
+                {{ col.name | to_camel_case }}: dto.{{ col.name }},
+{{~ end ~}}
+                createdBy: currentUserId);
+
+            id = await _repo.Create(entity, _uow);
+            await _uow.CommitAsync();
+        }
+        catch
+        {
+            await _uow.RollbackAsync();
+            throw;
+        }
+
+        return await GetById(id, tenantId, lang);
+    }
+
+    public async Task<{{ entity_name }}DetailDto> Update(int id, Update{{ entity_name }}Dto dto, int tenantId, int currentUserId, string lang)
+    {
+        // TODO: Добавьте бизнес-правила перед Update если нужно
+        await _uow.BeginAsync();
+        try
+        {
+            var entity = await _repo.GetEntityById(id, tenantId, _uow)
+                ?? throw new EntityNotFoundException("{{ entity_name }}", id);
+
+            entity.Update(
+{{~ for col in dto_columns ~}}
+                {{ col.name | to_camel_case }}: dto.{{ col.name }},
+{{~ end ~}}
+                updatedBy: currentUserId);
+
+            await _repo.Update(entity, _uow);
+            await _uow.CommitAsync();
+        }
+        catch
+        {
+            await _uow.RollbackAsync();
+            throw;
+        }
+
+        return await GetById(id, tenantId, lang);
+    }
+
+    public async Task Delete(int id, int tenantId)
+    {
+        await _uow.BeginAsync();
+        try
+        {
+            var entity = await _repo.GetEntityById(id, tenantId, _uow)
+                ?? throw new EntityNotFoundException("{{ entity_name }}", id);
+
+{{~ if has_is_active ~}}
+            entity.Deactivate();
+            await _repo.Update(entity, _uow);
+{{~ else ~}}
+            // TODO: Реализуйте логику удаления
+{{~ end ~}}
+            await _uow.CommitAsync();
+        }
+        catch
+        {
+            await _uow.RollbackAsync();
+            throw;
+        }
+    }
+}

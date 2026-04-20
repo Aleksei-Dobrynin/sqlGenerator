@@ -32,6 +32,12 @@ namespace SQLFileGenerator
         /// Коллекция внешних ключей таблицы
         /// </summary>
         public List<ForeignKeyInfo> ForeignKeys { get; set; } = new();
+
+        /// <summary>
+        /// Виртуальные внешние ключи, выведенные из конвенций именования колонок.
+        /// Не подтверждены явными REFERENCES или FOREIGN KEY в SQL.
+        /// </summary>
+        public List<ForeignKeyInfo> VirtualForeignKeys { get; set; } = new();
     }
 
     /// <summary>

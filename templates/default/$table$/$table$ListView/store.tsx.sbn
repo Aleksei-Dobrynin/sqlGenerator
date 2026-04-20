@@ -65,7 +65,7 @@ class NewStore {
   load{{ entity_name }}s = async () => {
     try {
       MainStore.changeLoader(true);
-      const response = await get{{ entity_name }}sPagination(this.pageSize, this.pageNumber, this.orderBy, this.orderType{{~ for fk in foreign_keys ~}}{{~ if fk.column_name == (table_name | to_snake_case) + "_id" ~}}, this.idMain{{~ end ~}}{{~ end ~}});
+      const response = await get{{ entity_name }}sPagination(this.pageSize, this.pageNumber, this.orderBy, this.orderType{{~ for fk in foreign_keys ~}}{{~ if fk.column_name == (table_name | to_snake_case) + "_id" ~}}, this.idMain{{~ end ~}}{{~ end ~}}{{~ for vfk in virtual_foreign_keys ~}}{{~ if vfk.column_name == (table_name | to_snake_case) + "_id" ~}}, this.idMain{{~ end ~}}{{~ end ~}});
       if ((response.status === 201 || response.status === 200) && response?.data !== null) {
         runInAction(() => {
           this.data = response.data.items;

@@ -3,7 +3,19 @@
     "allow": [
       "Bash(dir /b \"D:\\\\Practice\\\\SQLFileGenerator\")",
       "Bash(ls -la \"D:\\\\Practice\\\\SQLFileGenerator\\\\sql\"\" && head -100 \"D:PracticeSQLFileGeneratorsqlscript.sql \")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(claude mcp:*)",
+      "mcp__sql-generator__ParseSql",
+      "Bash(where opencode:*)",
+      "Read(//c/Users/doale/go/bin/**)",
+      "Read(//c/Users/doale/AppData/Local/**)",
+      "Read(//c/Users/doale/.local/bin/**)",
+      "Bash(npm info:*)",
+      "Read(//c/Users/doale/AppData/Roaming/nvm/v24.8.0/**)",
+      "Read(//c/Users/doale/AppData/Roaming/nvm/v24.8.0/node_modules/opencode-ai/bin/**)"
     ]
   }
 }

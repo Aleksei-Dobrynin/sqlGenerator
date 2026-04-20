@@ -169,5 +169,23 @@ namespace Infrastructure.Repositories
             }
         }
 {{~ end ~}}
+
+        // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+
+        public async Task<List<{{ entity_name }}>> GetBy{{ vfk.column_name | to_pascal_case | string.replace "_id" "" }}({{ vfk.csharp_type }} {{ vfk.column_name }})
+        {
+            try
+            {
+                var sql = "SELECT * FROM {{ table_name }} WHERE {{ vfk.column_name }} = @{{ vfk.column_name }}";
+                var models = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, new { {{ vfk.column_name }} }, transaction: _dbTransaction);
+                return models.ToList();
+            }
+            catch (Exception ex)
+            {
+                throw new RepositoryException("Failed to get {{ entity_name }} by {{ vfk.column_name }}", ex);
+            }
+        }
+{{~ end ~}}
     }
 }

@@ -5,7 +5,7 @@ import { observer } from "mobx-react";
 import { Dialog, DialogActions, DialogContent, DialogTitle, Grid } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import CustomButton from "components/Button";
-{{~ 
+{{~
   # Find child tables that reference this table
   child_tables = []
   for other_table in all_tables
@@ -15,10 +15,36 @@ import CustomButton from "components/Button";
       end
     end
   end
+
+  # Virtual Foreign Keys: find child tables via inferred relationships
+  virtual_child_tables = []
+  for other_table in virtual_all_tables
+    for fk in other_table.foreign_keys
+      if fk.references_table == table_name
+        # Avoid duplicates with real child_tables
+        already_added = false
+        for ct in child_tables
+          if ct.table_name == other_table.table_name
+            already_added = true
+            break
+          end
+        end
+        if !already_added
+          virtual_child_tables = virtual_child_tables | array.add other_table
+        end
+      end
+    end
+  end
 ~}}
 {{~ if child_tables.size > 0 ~}}
 // Import child table fast input forms
 {{~ for child in child_tables ~}}
+import FastInput{{ child.entity_name }}View from "features/{{ child.table_name | to_snake_case }}/{{ child.entity_name }}AddEditView/fastInput";
+{{~ end ~}}
+{{~ end ~}}
+{{~ if virtual_child_tables.size > 0 ~}}
+/* ═══ Virtual Foreign Keys: child table imports (inferred from naming conventions) ═══ */
+{{~ for child in virtual_child_tables ~}}
 import FastInput{{ child.entity_name }}View from "features/{{ child.table_name | to_snake_case }}/{{ child.entity_name }}AddEditView/fastInput";
 {{~ end ~}}
 {{~ end ~}}
@@ -48,18 +74,24 @@ const PopupForm: FC<PopupFormProps> = observer((props) => {
       <DialogContent>
 
         <Grid container>
-          <Grid md={{{~ if child_tables.size > 0 ~}}6{{~ else ~}}12{{~ end ~}}} xs={12} item>
+          <Grid md={{{~ if child_tables.size > 0 || virtual_child_tables.size > 0 ~}}6{{~ else ~}}12{{~ end ~}}} xs={12} item>
             <{{ entity_name }}AddEditBaseView
               isPopup={true}
             >
             </{{ entity_name }}AddEditBaseView>
           </Grid>
-{{~ if child_tables.size > 0 ~}}
+{{~ if child_tables.size > 0 || virtual_child_tables.size > 0 ~}}
           <Grid md={6} xs={12} item>
             {store.id !== 0 && (
               <>
 {{~ for child in child_tables ~}}
                 <FastInput{{ child.entity_name }}View idMain={store.id} />
+{{~ end ~}}
+{{~ if virtual_child_tables.size > 0 ~}}
+                {/* ═══ Virtual Foreign Keys: child forms (inferred from naming conventions) ═══ */}
+{{~ for child in virtual_child_tables ~}}
+                <FastInput{{ child.entity_name }}View idMain={store.id} />
+{{~ end ~}}
 {{~ end ~}}
               </>
             )}

@@ -1,0 +1,37 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+~}}
+using Template_v1.Application.DTOs;
+using FluentValidation;
+
+namespace Template_v1.Application.Validators;
+
+public class Update{{ entity_name }}Validator : AbstractValidator<Update{{ entity_name }}Dto>
+{
+    public Update{{ entity_name }}Validator()
+    {
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "string" && !col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name }})
+            .NotEmpty().WithMessage("Поле {{ col.name }} обязательно")
+            .MaximumLength(255).WithMessage("{{ col.name }} не должно превышать 255 символов");
+
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name }})
+            .MaximumLength(255).WithMessage("{{ col.name }} не должно превышать 255 символов")
+            .When(x => !string.IsNullOrWhiteSpace(x.{{ col.name }}));
+
+{{~   else if col.is_foreign_key && !col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name }})
+            .GreaterThan(0).WithMessage("Выберите значение для {{ col.name }}");
+
+{{~   end ~}}
+{{~ end ~}}
+        // TODO: Добавьте кастомные правила валидации
+    }
+}

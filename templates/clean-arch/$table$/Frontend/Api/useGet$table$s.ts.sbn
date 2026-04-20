@@ -1,0 +1,41 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_is_active = false
+  for col in columns
+    if col.name == "IsActive"; has_is_active = true; end
+  end
+
+  has_fk = false
+  for col in dto_columns
+    if col.is_foreign_key; has_fk = true; end
+  end
+
+  route_name = entity_name | to_snake_case
+  entity_camel = entity_name | to_camel_case
+~}}
+import http from '@api/https';
+import type { I{{ entity_name }}ListDto } from '@constants/DataModels/{{ entity_name }}/{{ entity_name }}Types';
+import type { IPagedResult } from '@constants/DataModels/Organization/CompanyTypes';
+
+export const get{{ entity_name }}s = async (params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+{{~ if has_is_active ~}}
+  isActive?: boolean;
+{{~ end ~}}
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+  {{ col.name | to_camel_case }}?: number;
+{{~   end ~}}
+{{~ end ~}}
+}): Promise<IPagedResult<I{{ entity_name }}ListDto>> => {
+  const response = await http.http.get<IPagedResult<I{{ entity_name }}ListDto>>('/api/{{ route_name }}s', { params });
+  return response.data;
+};

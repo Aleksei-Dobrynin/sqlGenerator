@@ -27,6 +27,7 @@ Parse a PostgreSQL SQL file using regex. Fast, works for simple DDL.
 |-----------|----------|-------------|
 | `sqlFilePath` | yes | Path to `.sql` file with `CREATE TABLE` statements |
 | `outputPath` | no | Output path for schema JSON (default: `schema.json`) |
+| `includeVirtualFks` | no | Include virtual foreign keys inferred from naming conventions (default: `true`) |
 
 **Returns:** `{ success, tableCount, tables[], schemaFile }`
 
@@ -53,6 +54,7 @@ Generate code files from a schema JSON using templates.
 | `outputDir` | yes | Output directory for generated files |
 | `templatesDir` | no | Templates directory (default: `templates`) |
 | `presetName` | no | Template preset name (call `ListPresets` first) |
+| `includeVirtualFks` | no | Include virtual foreign keys inferred from naming conventions (default: `true`) |
 
 **Returns:** `{ success, outputDir, tableCount, fileCount }`
 
@@ -66,6 +68,7 @@ Parse SQL file + generate files in one call. For simple DDL only.
 | `outputDir` | yes | Output directory |
 | `templatesDir` | no | Templates directory (default: `templates`) |
 | `presetName` | no | Template preset name |
+| `includeVirtualFks` | no | Include virtual foreign keys inferred from naming conventions (default: `true`) |
 
 **Returns:** `{ success, outputDir, tableCount, fileCount }`
 
@@ -137,10 +140,21 @@ Agent -> ParseSql(sqlFilePath) -> GenerateFiles(schemaFile, outputDir, presetNam
         "ReferencesColumn": "id",
         "ConstraintName": null
       }
+    ],
+    "VirtualForeignKeys": [
+      {
+        "ColumnName": "department_id",
+        "CSharpType": "int",
+        "ReferencesTable": "org.departments",
+        "ReferencesColumn": "id",
+        "ConstraintName": null
+      }
     ]
   }
 ]
 ```
+
+**Note:** `VirtualForeignKeys` contains relationships inferred from column naming conventions (`*_id`, `id_*`, `id*` patterns) when no explicit `REFERENCES` exists. Populated when `includeVirtualFks` is `true`.
 
 ## Type Mapping (PostgreSQL to C#)
 

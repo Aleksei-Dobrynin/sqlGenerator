@@ -18,7 +18,9 @@ public class SqlGeneratorTools
         [Description("Path to .sql file containing CREATE TABLE statements")]
         string sqlFilePath,
         [Description("Output path for schema JSON file. Default: 'schema.json'")]
-        string outputPath = "schema.json")
+        string outputPath = "schema.json",
+        [Description("Include virtual foreign keys inferred from naming conventions (e.g. user_id -> users.id). Default: true")]
+        bool includeVirtualFks = true)
     {
         try
         {
@@ -34,6 +36,9 @@ public class SqlGeneratorTools
 
             var sql = File.ReadAllText(fullSqlPath);
             var tables = SqlParser.ParsePostgresCreateTableScript(sql);
+
+            if (includeVirtualFks)
+                VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
 
             if (tables.Count == 0)
             {
@@ -186,7 +191,9 @@ public class SqlGeneratorTools
         [Description("Templates directory. Default: 'templates'")]
         string templatesDir = "templates",
         [Description("Template preset name (e.g. 'default'). If not specified and presets exist, returns error. Call 'list_presets' first.")]
-        string presetName = "")
+        string presetName = "",
+        [Description("Include virtual foreign keys inferred from naming conventions (e.g. user_id -> users.id). Default: true")]
+        bool includeVirtualFks = true)
     {
         try
         {
@@ -204,12 +211,15 @@ public class SqlGeneratorTools
             if (tables == null || tables.Count == 0)
                 return Fail("No tables in schema file");
 
+            if (includeVirtualFks)
+                VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
+
             var outputPath = Path.GetFullPath(outputDir);
             Directory.CreateDirectory(outputPath);
 
             var fileCountBefore = Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories).Length;
 
-            FileGenerator.GenerateOtherFiles(tables, templatesPath, outputPath);
+            FileGenerator.GenerateOtherFiles(tables, templatesPath, outputPath, includeVirtualFks);
 
             var fileCountAfter = Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories).Length;
 
@@ -240,7 +250,9 @@ public class SqlGeneratorTools
         [Description("Templates directory. Default: 'templates'")]
         string templatesDir = "templates",
         [Description("Template preset name (e.g. 'default'). If not specified and presets exist, returns error. Call 'list_presets' first.")]
-        string presetName = "")
+        string presetName = "",
+        [Description("Include virtual foreign keys inferred from naming conventions (e.g. user_id -> users.id). Default: true")]
+        bool includeVirtualFks = true)
     {
         try
         {
@@ -261,12 +273,15 @@ public class SqlGeneratorTools
             if (tables.Count == 0)
                 return Fail("No tables found. For complex SQL, parse it yourself and use save_schema + generate_files.");
 
+            if (includeVirtualFks)
+                VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
+
             var outputPath = Path.GetFullPath(outputDir);
             Directory.CreateDirectory(outputPath);
 
             var fileCountBefore = Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories).Length;
 
-            FileGenerator.GenerateOtherFiles(tables, templatesPath, outputPath);
+            FileGenerator.GenerateOtherFiles(tables, templatesPath, outputPath, includeVirtualFks);
 
             var fileCountAfter = Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories).Length;
 

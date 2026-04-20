@@ -14,5 +14,10 @@ namespace Application.Repositories
 {{~ for fk in foreign_keys ~}}
         Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | to_pascal_case | string.replace "_id" "" }}({{ fk.csharp_type }} {{ fk.column_name }});
 {{~ end ~}}
+
+        // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+        Task<List<{{ entity_name }}>> GetBy{{ vfk.column_name | to_pascal_case | string.replace "_id" "" }}({{ vfk.csharp_type }} {{ vfk.column_name }});
+{{~ end ~}}
     }
 }

@@ -37,6 +37,13 @@ IMPORTANT RULES:
 7. IsNullable = true unless NOT NULL is specified or column is PRIMARY KEY
 8. IsPrimaryKey = true if PRIMARY KEY constraint is present
 9. IsForeignKey = true only if REFERENCES is present
+10. **Virtual Foreign Keys**: After parsing explicit ForeignKeys, populate ""VirtualForeignKeys"" array for columns that imply relationships by naming convention but have NO explicit REFERENCES:
+    - Naming patterns to detect: *_id suffix (e.g. user_id), id_* prefix (e.g. id_user), id* prefix without separator (e.g. iduser)
+    - Skip columns already in ForeignKeys (explicit FK)
+    - Skip primary key columns
+    - For matching columns, strip the id part to get candidate table name, then match against other parsed table names (try exact match, then plural forms: +s, +es, y->ies)
+    - Use ""id"" as ReferencesColumn, set ConstraintName to null
+    - If no matching table is found, do NOT add a virtual FK for that column
 
 OUTPUT JSON SCHEMA:
 [
@@ -59,6 +66,15 @@ OUTPUT JSON SCHEMA:
         ""ReferencesTable"": ""referenced_table"",
         ""ReferencesColumn"": ""id"",
         ""ConstraintName"": ""constraint_name_or_null""
+      }
+    ],
+    ""VirtualForeignKeys"": [
+      {
+        ""ColumnName"": ""inferred_fk_column"",
+        ""CSharpType"": ""int"",
+        ""ReferencesTable"": ""inferred_table"",
+        ""ReferencesColumn"": ""id"",
+        ""ConstraintName"": null
       }
     ]
   }

@@ -13,19 +13,19 @@ namespace SQLFileGenerator.LlmParser
         /// Regex для извлечения CREATE TABLE блоков
         /// </summary>
         private static readonly Regex CreateTableRegex = new(
-            @"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\((.+?)\);",
+            @"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w.]+)\s*\((.+?)\);",
             RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
 
         /// <summary>
         /// Regex для извлечения ALTER TABLE ADD CONSTRAINT FOREIGN KEY
         /// </summary>
         private static readonly Regex AlterTableFkRegex = new(
-            @"ALTER\s+TABLE\s+(\w+)\s+ADD\s+CONSTRAINT\s+(\w+)\s+FOREIGN\s+KEY\s*\((\w+)\)\s+REFERENCES\s+(\w+)(?:\s*\((\w+)\))?[^;]*;",
+            @"ALTER\s+TABLE\s+([\w.]+)\s+ADD\s+CONSTRAINT\s+(\w+)\s+FOREIGN\s+KEY\s*\((\w+)\)\s+REFERENCES\s+([\w.]+)(?:\s*\((\w+)\))?[^;]*;",
             RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
 
-        public SqlChunker(int maxTablesPerChunk = 5)
+        public SqlChunker(int maxTablesPerChunk = 0)
         {
-            _maxTablesPerChunk = maxTablesPerChunk > 0 ? maxTablesPerChunk : 5;
+            _maxTablesPerChunk = maxTablesPerChunk;
         }
 
         /// <summary>
@@ -128,15 +128,17 @@ namespace SQLFileGenerator.LlmParser
         }
 
         /// <summary>
-        /// Создает chunks из блоков таблиц
+        /// Создает chunks из блоков таблиц.
+        /// При _maxTablesPerChunk &lt;= 0 все таблицы идут в один chunk (без разбиения).
         /// </summary>
         private List<SqlChunk> CreateChunks(List<TableBlock> tableBlocks)
         {
             var chunks = new List<SqlChunk>();
+            var chunkSize = _maxTablesPerChunk > 0 ? _maxTablesPerChunk : tableBlocks.Count;
 
-            for (int i = 0; i < tableBlocks.Count; i += _maxTablesPerChunk)
+            for (int i = 0; i < tableBlocks.Count; i += chunkSize)
             {
-                var chunkBlocks = tableBlocks.Skip(i).Take(_maxTablesPerChunk).ToList();
+                var chunkBlocks = tableBlocks.Skip(i).Take(chunkSize).ToList();
 
                 var sqlParts = new List<string>();
                 var tableNames = new List<string>();

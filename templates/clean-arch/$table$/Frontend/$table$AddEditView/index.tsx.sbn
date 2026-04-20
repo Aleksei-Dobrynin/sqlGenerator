@@ -1,0 +1,52 @@
+{{~
+  route_name = entity_name | to_snake_case
+  entity_camel = entity_name | to_camel_case
+~}}
+import { useEffect, useState } from 'react';
+import { observer } from 'mobx-react';
+import { useParams, useNavigate } from 'react-router';
+import { Box, Button, Paper, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { create{{ entity_name }}FormStore } from './store';
+import {{ entity_name }}AddEditBase from './base';
+import {{ entity_name }}MtmTabs from './mtmTabs';
+
+const {{ entity_name }}AddEditView = observer(function {{ entity_name }}AddEditView() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const [store] = useState(create{{ entity_name }}FormStore);
+
+  useEffect(() => {
+    store.clearStore();
+    store.doLoad(id ? Number(id) : null);
+    return () => store.clearStore();
+  }, [id, store]);
+
+  return (
+    <Box sx={{ '{{' }} p: 3 {{ '}}' }}>
+      <Typography variant="h5" sx={{ '{{' }} mb: 3 {{ '}}' }}>
+        {id ? t('label:{{ entity_camel }}.edit{{ entity_name }}') : t('label:{{ entity_camel }}.new{{ entity_name }}')}
+      </Typography>
+      <Paper sx={{ '{{' }} p: 3 {{ '}}' }}>
+        <{{ entity_name }}AddEditBase store={store} />
+      </Paper>
+      <Box sx={{ '{{' }} display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 {{ '}}' }}>
+        <Button onClick={() => navigate(-1)} data-cy="{{ entity_camel }}-page-cancel-btn">
+          {t('common:cancel')}
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => store.onSaveClick(() => navigate('/user/{{ route_name }}s'))}
+          disabled={store.isSaving}
+          data-cy="{{ entity_camel }}-page-save-btn"
+        >
+          {t('common:save')}
+        </Button>
+      </Box>
+      {store.id && <{{ entity_name }}MtmTabs {{ entity_camel }}Id={store.id} />}
+    </Box>
+  );
+});
+
+export default {{ entity_name }}AddEditView;

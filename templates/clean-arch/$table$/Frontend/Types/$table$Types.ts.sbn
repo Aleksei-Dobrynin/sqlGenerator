@@ -1,0 +1,70 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_is_active = false
+  has_audit = false
+  for col in columns
+    if col.name == "IsActive"; has_is_active = true; end
+    if col.name == "CreatedAt"; has_audit = true; end
+  end
+
+  entity_camel = entity_name | to_camel_case
+~}}
+export interface I{{ entity_name }}ListDto {
+  id: number;
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+  {{ col.name | to_camel_case }}: number{{ if col.is_nullable }} | null{{ end }};
+  {{ col.name | remove_id_suffix | to_camel_case }}DisplayName: string | null;
+{{~   else if col.csharp_type == "string" ~}}
+  {{ col.name | to_camel_case }}: string{{ if col.is_nullable }} | null{{ end }};
+{{~   else if col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal" ~}}
+  {{ col.name | to_camel_case }}: number{{ if col.is_nullable }} | null{{ end }};
+{{~   else if col.csharp_type == "bool" ~}}
+  {{ col.name | to_camel_case }}: boolean;
+{{~   else if col.csharp_type == "DateTime" ~}}
+  {{ col.name | to_camel_case }}: string{{ if col.is_nullable }} | null{{ end }};
+{{~   end ~}}
+{{~ end ~}}
+{{~ if has_is_active ~}}
+  isActive: boolean;
+{{~ end ~}}
+}
+
+export interface I{{ entity_name }}DetailDto {
+  id: number;
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "string" ~}}
+  {{ col.name | to_camel_case }}: string{{ if col.is_nullable }} | null{{ end }};
+{{~   else if col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal" ~}}
+  {{ col.name | to_camel_case }}: number{{ if col.is_nullable }} | null{{ end }};
+{{~   else if col.csharp_type == "bool" ~}}
+  {{ col.name | to_camel_case }}: boolean;
+{{~   else if col.csharp_type == "DateTime" ~}}
+  {{ col.name | to_camel_case }}: string{{ if col.is_nullable }} | null{{ end }};
+{{~   end ~}}
+{{~ end ~}}
+{{~ if has_audit ~}}
+  createdAt: string;
+  updatedAt: string;
+{{~ end ~}}
+}
+
+export interface I{{ entity_name }}SaveDto {
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "string" ~}}
+  {{ col.name | to_camel_case }}: string{{ if col.is_nullable }} | null{{ end }};
+{{~   else if col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal" ~}}
+  {{ col.name | to_camel_case }}: number{{ if col.is_nullable }} | null{{ end }};
+{{~   else if col.csharp_type == "bool" ~}}
+  {{ col.name | to_camel_case }}: boolean;
+{{~   else if col.csharp_type == "DateTime" ~}}
+  {{ col.name | to_camel_case }}: string | null;
+{{~   end ~}}
+{{~ end ~}}
+}

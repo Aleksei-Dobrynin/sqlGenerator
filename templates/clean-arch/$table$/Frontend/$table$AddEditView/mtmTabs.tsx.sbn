@@ -1,0 +1,154 @@
+{{~
+  entity_camel = entity_name | to_camel_case
+
+  child_tables = []
+  for t in all_tables
+    if t.table_name != table_name
+      for fk in t.foreign_keys
+        if fk.references_table == table_name
+          child_tables = child_tables | array.add t
+          break
+        end
+      end
+    end
+  end
+
+  # Virtual Foreign Keys: find child tables via inferred relationships
+  virtual_child_tables = []
+  for t in virtual_all_tables
+    if t.table_name != table_name
+      for fk in t.foreign_keys
+        if fk.references_table == table_name
+          # Avoid duplicates with real child_tables
+          already_added = false
+          for ct in child_tables
+            if ct.table_name == t.table_name
+              already_added = true
+              break
+            end
+          end
+          if !already_added
+            virtual_child_tables = virtual_child_tables | array.add t
+            break
+          end
+        end
+      end
+    end
+  end
+
+  has_children = child_tables | array.size > 0
+  has_virtual_children = virtual_child_tables | array.size > 0
+~}}
+{{~ if has_children || has_virtual_children ~}}
+import { useState } from 'react';
+import { Box, Tab, Tabs } from '@mui/material';
+import { useTranslation } from 'react-i18next';
+{{~ for child in child_tables ~}}
+import {{ child.entity_name }}ListView from '@features/{{ child.entity_name }}/{{ child.entity_name }}ListView';
+{{~ end ~}}
+{{~ if has_virtual_children ~}}
+/* ═══ Virtual Foreign Keys: child table imports (inferred from naming conventions) ═══ */
+{{~ for child in virtual_child_tables ~}}
+import {{ child.entity_name }}ListView from '@features/{{ child.entity_name }}/{{ child.entity_name }}ListView';
+{{~ end ~}}
+{{~ end ~}}
+import type { ListEditMode, TabOrientation } from '@constants/listView';
+
+interface Props {
+  {{ entity_camel }}Id: number;
+  editMode?: ListEditMode;
+  orientation?: TabOrientation;
+}
+
+const {{ entity_name }}MtmTabs = ({ {{ entity_camel }}Id, editMode = 'popup', orientation = 'horizontal' }: Props) => {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState(0);
+
+  if (orientation === 'vertical') {
+    return (
+      <Box sx={{ '{{' }} display: 'flex', height: '100%' {{ '}}' }}>
+        <Box sx={{ '{{' }} width: 200, borderRight: 1, borderColor: 'divider' {{ '}}' }}>
+          <Tabs
+            value={tab}
+            onChange={(_e, v) => setTab(v)}
+            orientation="vertical"
+            variant="scrollable"
+            sx={{ '{{' }} borderRight: 1, borderColor: 'divider' {{ '}}' }}
+            data-cy="{{ entity_camel }}-mtm-tabs"
+          >
+{{~ for child in child_tables ~}}
+            <Tab label={t('label:{{ child.entity_name | to_camel_case }}.title')} data-cy="{{ entity_camel }}-mtm-tab-{{ child.entity_name | to_camel_case }}" />
+{{~ end ~}}
+{{~ if has_virtual_children ~}}
+            {/* ═══ Virtual Foreign Keys: tabs (inferred from naming conventions) ═══ */}
+{{~ for child in virtual_child_tables ~}}
+            <Tab label={t('label:{{ child.entity_name | to_camel_case }}.title')} data-cy="{{ entity_camel }}-mtm-tab-{{ child.entity_name | to_camel_case }}" />
+{{~ end ~}}
+{{~ end ~}}
+          </Tabs>
+        </Box>
+        <Box sx={{ '{{' }} flex: 1, p: 2, overflow: 'auto' {{ '}}' }}>
+{{~ for child in child_tables ~}}
+          {tab === {{ for.index }} && <{{ child.entity_name }}ListView idMain={ {{ entity_camel }}Id} editMode={editMode} />}
+{{~ end ~}}
+{{~ if has_virtual_children ~}}
+          {/* ═══ Virtual Foreign Keys: panels (inferred from naming conventions) ═══ */}
+{{~ for child in virtual_child_tables ~}}
+          {tab === {{ for.index + (child_tables | array.size) }} && <{{ child.entity_name }}ListView idMain={ {{ entity_camel }}Id} editMode={editMode} />}
+{{~ end ~}}
+{{~ end ~}}
+        </Box>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ '{{' }} mt: 3 {{ '}}' }}>
+      <Box sx={{ '{{' }} borderBottom: 1, borderColor: 'divider', mb: 2 {{ '}}' }}>
+        <Tabs
+          value={tab}
+          onChange={(_e, v) => setTab(v)}
+          data-cy="{{ entity_camel }}-mtm-tabs"
+        >
+{{~ for child in child_tables ~}}
+          <Tab label={t('label:{{ child.entity_name | to_camel_case }}.title')} data-cy="{{ entity_camel }}-mtm-tab-{{ child.entity_name | to_camel_case }}" />
+{{~ end ~}}
+{{~ if has_virtual_children ~}}
+          {/* ═══ Virtual Foreign Keys: tabs (inferred from naming conventions) ═══ */}
+{{~ for child in virtual_child_tables ~}}
+          <Tab label={t('label:{{ child.entity_name | to_camel_case }}.title')} data-cy="{{ entity_camel }}-mtm-tab-{{ child.entity_name | to_camel_case }}" />
+{{~ end ~}}
+{{~ end ~}}
+        </Tabs>
+      </Box>
+
+{{~ for child in child_tables ~}}
+      {tab === {{ for.index }} && <{{ child.entity_name }}ListView idMain={ {{ entity_camel }}Id} editMode={editMode} />}
+{{~ end ~}}
+{{~ if has_virtual_children ~}}
+      {/* ═══ Virtual Foreign Keys: panels (inferred from naming conventions) ═══ */}
+{{~ for child in virtual_child_tables ~}}
+      {tab === {{ for.index + (child_tables | array.size) }} && <{{ child.entity_name }}ListView idMain={ {{ entity_camel }}Id} editMode={editMode} />}
+{{~ end ~}}
+{{~ end ~}}
+    </Box>
+  );
+};
+
+export default {{ entity_name }}MtmTabs;
+{{~ else ~}}
+// {{ entity_name }}MtmTabs — нет связанных дочерних таблиц
+// Добавьте дочерние ListView сюда при появлении связей
+
+interface Props {
+  {{ entity_camel }}Id: number;
+  editMode?: string;
+  orientation?: string;
+}
+
+const {{ entity_name }}MtmTabs = (_props: Props) => {
+  return null;
+};
+
+export default {{ entity_name }}MtmTabs;
+{{~ end ~}}

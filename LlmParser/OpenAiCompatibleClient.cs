@@ -141,6 +141,23 @@ namespace SQLFileGenerator.LlmParser
 
                 if (string.IsNullOrEmpty(content))
                 {
+                    // Thinking-модели (Gemma 4, DeepSeek R1 и др.) помещают reasoning в отдельное поле,
+                    // а content может быть пустым если finish_reason=length
+                    var reasoningContent = json["choices"]?[0]?["message"]?["reasoning_content"]?.ToString();
+                    if (!string.IsNullOrEmpty(reasoningContent))
+                    {
+                        // Пытаемся извлечь JSON из reasoning_content
+                        var jsonStart = reasoningContent.IndexOf('[');
+                        var jsonEnd = reasoningContent.LastIndexOf(']');
+                        if (jsonStart >= 0 && jsonEnd > jsonStart)
+                        {
+                            content = reasoningContent.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(content))
+                {
                     // Альтернативный формат (некоторые API)
                     content = json["response"]?.ToString()
                            ?? json["content"]?.ToString()

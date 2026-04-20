@@ -1,0 +1,166 @@
+{{~
+  # Detect audit fields
+  has_audit = false
+  for col in columns
+    if col.name == "CreatedAt" || col.name == "UpdatedAt" || col.name == "CreatedBy" || col.name == "UpdatedBy"
+      has_audit = true
+      break
+    end
+  end
+
+  # Detect is_active
+  has_is_active = false
+  for col in columns
+    if col.name == "IsActive"
+      has_is_active = true
+      break
+    end
+  end
+
+  # Detect is_deleted
+  has_is_deleted = false
+  for col in columns
+    if col.name == "IsDeleted"
+      has_is_deleted = true
+      break
+    end
+  end
+
+  # Filter columns for Create/Update params (exclude system + tenant + flags)
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+~}}
+using Template_v1.Domain.Exceptions;
+{{~ if has_audit ~}}
+using Template_v1.Domain.Interfaces;
+{{~ end ~}}
+
+namespace Template_v1.Domain.Entities;
+
+// TODO: Добавьте Value Objects для полей, требующих валидации (Email, Phone и т.д.)
+// TODO: Добавьте Business Rules (см. Domain/BusinessRules/)
+
+{{~ if has_audit ~}}
+public class {{ entity_name }} : IAuditableEntity
+{{~ else ~}}
+public class {{ entity_name }}
+{{~ end ~}}
+{
+{{~ for col in columns ~}}
+{{~   if col.is_nullable && !col.is_primary_key && col.csharp_type != "string" ~}}
+    public {{ col.csharp_type }}? {{ col.name }} { get; private set; }
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+    public string? {{ col.name }} { get; private set; }
+{{~   else if col.csharp_type == "string" ~}}
+    public string {{ col.name }} { get; private set; } = string.Empty;
+{{~   else ~}}
+    public {{ col.csharp_type }} {{ col.name }} { get; private set; }
+{{~   end ~}}
+{{~ end ~}}
+
+    private {{ entity_name }}() { }
+
+    // ═══════════════════════════════════════════════════════════
+    // Factory Methods
+    // ═══════════════════════════════════════════════════════════
+
+    public static {{ entity_name }} Create(
+        int tenantId,
+{{~ for col in dto_columns ~}}
+        {{ col.csharp_type }}{{~ if col.is_nullable && col.csharp_type != "string" ~}}?{{~ end ~}} {{ col.name | to_camel_case }}{{~ if !for.last ~}},{{~ end ~}}
+{{~ end ~}},
+        int? createdBy = null)
+    {
+        var entity = new {{ entity_name }}
+        {
+{{~ if primary_key ~}}
+            {{ primary_key.name }} = 0,
+{{~ end ~}}
+            TenantId = tenantId,
+{{~ for col in dto_columns ~}}
+            {{ col.name }} = {{ col.name | to_camel_case }},
+{{~ end ~}}
+{{~ if has_is_active ~}}
+            IsActive = true,
+{{~ end ~}}
+{{~ if has_is_deleted ~}}
+            IsDeleted = false,
+{{~ end ~}}
+{{~ if has_audit ~}}
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            CreatedBy = createdBy
+{{~ end ~}}
+        };
+
+        entity.ValidateInvariants();
+        return entity;
+    }
+
+    internal static {{ entity_name }} Reconstitute(
+{{~ for col in columns ~}}
+        {{ col.csharp_type }}{{~ if col.is_nullable && col.csharp_type != "string" ~}}?{{~ end ~}} {{ col.name | to_camel_case }}{{~ if !for.last ~}},{{~ end ~}}
+{{~ end ~}})
+    {
+        return new {{ entity_name }}
+        {
+{{~ for col in columns ~}}
+            {{ col.name }} = {{ col.name | to_camel_case }}{{~ if !for.last ~}},{{~ end ~}}
+{{~ end ~}}
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Domain Behavior Methods
+    // ═══════════════════════════════════════════════════════════
+
+    public void Update(
+{{~ for col in dto_columns ~}}
+        {{ col.csharp_type }}{{~ if col.is_nullable && col.csharp_type != "string" ~}}?{{~ end ~}} {{ col.name | to_camel_case }},
+{{~ end ~}}
+        int? updatedBy)
+    {
+{{~ for col in dto_columns ~}}
+        {{ col.name }} = {{ col.name | to_camel_case }};
+{{~ end ~}}
+{{~ if has_audit ~}}
+        UpdatedAt = DateTime.UtcNow;
+        UpdatedBy = updatedBy;
+{{~ end ~}}
+
+        ValidateInvariants();
+    }
+
+{{~ if has_is_active ~}}
+    public void Deactivate(int? updatedBy = null)
+    {
+        IsActive = false;
+{{~ if has_audit ~}}
+        UpdatedAt = DateTime.UtcNow;
+        UpdatedBy = updatedBy;
+{{~ end ~}}
+    }
+{{~ end ~}}
+
+    // ═══════════════════════════════════════════════════════════
+    // Invariant Validation
+    // ═══════════════════════════════════════════════════════════
+
+    public void ValidateInvariants()
+    {
+        // TODO: Добавьте проверку инвариантов (синхронные правила без внешних зависимостей)
+        // Пример:
+        // if (string.IsNullOrWhiteSpace(Name))
+        //     throw new DomainException("Название обязательно");
+{{~ for col in dto_columns ~}}
+{{~   if !col.is_nullable && col.is_foreign_key ~}}
+        if ({{ col.name }} <= 0)
+            throw new DomainException("Некорректный {{ col.name }}");
+{{~   end ~}}
+{{~ end ~}}
+    }
+}

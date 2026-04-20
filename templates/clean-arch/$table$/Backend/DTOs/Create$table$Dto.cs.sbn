@@ -1,0 +1,24 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+~}}
+namespace Template_v1.Application.DTOs;
+
+public class Create{{ entity_name }}Dto
+{
+{{~ for col in dto_columns ~}}
+{{~   if col.is_nullable && col.csharp_type != "string" ~}}
+    public {{ col.csharp_type }}? {{ col.name }} { get; set; }
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+    public string? {{ col.name }} { get; set; }
+{{~   else if col.csharp_type == "string" ~}}
+    public string {{ col.name }} { get; set; } = string.Empty;
+{{~   else ~}}
+    public {{ col.csharp_type }} {{ col.name }} { get; set; }
+{{~   end ~}}
+{{~ end ~}}
+}

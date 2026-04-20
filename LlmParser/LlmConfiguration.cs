@@ -33,9 +33,10 @@ namespace SQLFileGenerator.LlmParser
         public double Temperature { get; set; } = 0.1;
 
         /// <summary>
-        /// Максимальное количество таблиц в одном chunk для больших БД
+        /// Максимальное количество таблиц в одном chunk для больших БД.
+        /// 0 = отключить чанкование (весь SQL в одном запросе, рекомендуется для моделей с большим контекстом).
         /// </summary>
-        public int MaxTablesPerChunk { get; set; } = 5;
+        public int MaxTablesPerChunk { get; set; } = 0;
 
         /// <summary>
         /// Максимальное количество повторных попыток при ошибках

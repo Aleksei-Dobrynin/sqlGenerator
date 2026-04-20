@@ -1,0 +1,206 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_datetime = false
+  has_fk = false
+  for col in dto_columns
+    if col.csharp_type == "DateTime"; has_datetime = true; end
+    if col.is_foreign_key; has_fk = true; end
+  end
+
+  route_name = entity_name | to_snake_case
+  entity_camel = entity_name | to_camel_case
+~}}
+import { makeAutoObservable, runInAction } from 'mobx';
+{{~ if has_datetime ~}}
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
+{{~ end ~}}
+import MainStore from '@/MainStore';
+import i18n from 'i18next';
+import { get{{ entity_name }} } from '@api/{{ entity_name }}/useGet{{ entity_name }}';
+import { create{{ entity_name }}, update{{ entity_name }} } from '@api/{{ entity_name }}/useSave{{ entity_name }}';
+import type { I{{ entity_name }}SaveDto } from '@constants/DataModels/{{ entity_name }}/{{ entity_name }}Types';
+{{~ if has_fk ~}}
+import type { IRefOption } from '@constants/DataModels/Organization/CompanyTypes';
+{{~ end ~}}
+import { validate } from './valid';
+
+class {{ entity_name }}FormStore {
+  id: number | null = null;
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "string" && !col.is_nullable ~}}
+  {{ col.name | to_camel_case }} = '';
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+  {{ col.name | to_camel_case }}: string | null = null;
+{{~   else if (col.csharp_type == "int" || col.csharp_type == "long") && col.is_foreign_key ~}}
+  {{ col.name | to_camel_case }}: number | null = null;
+{{~   else if (col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal") && col.is_nullable ~}}
+  {{ col.name | to_camel_case }}: number | null = null;
+{{~   else if col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal" ~}}
+  {{ col.name | to_camel_case }} = 0;
+{{~   else if col.csharp_type == "bool" ~}}
+  {{ col.name | to_camel_case }} = false;
+{{~   else if col.csharp_type == "DateTime" ~}}
+  {{ col.name | to_camel_case }}: Dayjs | null = null;
+{{~   end ~}}
+{{~ end ~}}
+
+  errors: Record<string, string> = {};
+  isLoading = false;
+  isSaving = false;
+
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+  {{ col.name | remove_id_suffix | to_camel_case }}Refs: IRefOption[] = [];
+{{~   end ~}}
+{{~ end ~}}
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  handleChange = (name: string, value: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this as any)[name] = value;
+    validate(name, this);
+  };
+{{~ if has_fk ~}}
+
+  handleSelectChange = (name: string, value: number | string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this as any)[name] = value ? Number(value) : null;
+    validate(name, this);
+  };
+{{~ end ~}}
+
+  async loadRefs() {
+    try {
+{{~ if has_fk ~}}
+      const [{{ for col in dto_columns }}{{ if col.is_foreign_key }}{{ col.name | remove_id_suffix | to_camel_case }}Result{{ if !for.last }}, {{ end }}{{ end }}{{ end }}] = await Promise.all([
+{{~   for col in dto_columns ~}}
+{{~     if col.is_foreign_key ~}}
+        // TODO: Заменить на реальный API-вызов для {{ col.name | remove_id_suffix }}
+        Promise.resolve([] as IRefOption[]),
+{{~     end ~}}
+{{~   end ~}}
+      ]);
+      runInAction(() => {
+{{~   for col in dto_columns ~}}
+{{~     if col.is_foreign_key ~}}
+        this.{{ col.name | remove_id_suffix | to_camel_case }}Refs = {{ col.name | remove_id_suffix | to_camel_case }}Result;
+{{~     end ~}}
+{{~   end ~}}
+      });
+{{~ end ~}}
+    } catch {
+      // refs load silently
+    }
+  }
+
+  async loadEntity(id: number) {
+    this.isLoading = true;
+    try {
+      const data = await get{{ entity_name }}(id);
+      runInAction(() => {
+        this.id = data.id;
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "DateTime" ~}}
+        this.{{ col.name | to_camel_case }} = data.{{ col.name | to_camel_case }} ? dayjs(data.{{ col.name | to_camel_case }}) : null;
+{{~   else ~}}
+        this.{{ col.name | to_camel_case }} = data.{{ col.name | to_camel_case }};
+{{~   end ~}}
+{{~ end ~}}
+      });
+    } catch {
+      MainStore.openErrorDialog(i18n.t('message:error.genericError'));
+    } finally {
+      runInAction(() => {
+        this.isLoading = false;
+      });
+    }
+  }
+
+  async doLoad(id?: number | null) {
+    await this.loadRefs();
+    if (id) {
+      await this.loadEntity(id);
+    }
+  }
+
+  buildDto(): I{{ entity_name }}SaveDto {
+    return {
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "DateTime" ~}}
+      {{ col.name | to_camel_case }}: this.{{ col.name | to_camel_case }}?.format('YYYY-MM-DD') ?? null,
+{{~   else ~}}
+      {{ col.name | to_camel_case }}: this.{{ col.name | to_camel_case }},
+{{~   end ~}}
+{{~ end ~}}
+    };
+  }
+
+  async onSaveClick(onSuccess?: (id: number) => void) {
+    if (!validate('_all', this)) {
+      MainStore.openErrorDialog(i18n.t('message:error.alertMessageAlert'));
+      return;
+    }
+
+    this.isSaving = true;
+    try {
+      const dto = this.buildDto();
+      if (this.id) {
+        await update{{ entity_name }}(this.id, dto);
+        MainStore.setSnackbar(i18n.t('message:snackbar.successSave'), 'success');
+        onSuccess?.(this.id);
+      } else {
+        const created = await create{{ entity_name }}(dto);
+        MainStore.setSnackbar(i18n.t('message:snackbar.successSave'), 'success');
+        onSuccess?.(created.id);
+      }
+    } catch {
+      // error handled by interceptor
+    } finally {
+      runInAction(() => {
+        this.isSaving = false;
+      });
+    }
+  }
+
+  clearStore = () => {
+    this.id = null;
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "string" && !col.is_nullable ~}}
+    this.{{ col.name | to_camel_case }} = '';
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+    this.{{ col.name | to_camel_case }} = null;
+{{~   else if (col.csharp_type == "int" || col.csharp_type == "long") && col.is_foreign_key ~}}
+    this.{{ col.name | to_camel_case }} = null;
+{{~   else if (col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal") && col.is_nullable ~}}
+    this.{{ col.name | to_camel_case }} = null;
+{{~   else if col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal" ~}}
+    this.{{ col.name | to_camel_case }} = 0;
+{{~   else if col.csharp_type == "bool" ~}}
+    this.{{ col.name | to_camel_case }} = false;
+{{~   else if col.csharp_type == "DateTime" ~}}
+    this.{{ col.name | to_camel_case }} = null;
+{{~   end ~}}
+{{~ end ~}}
+    this.errors = {};
+    this.isLoading = false;
+    this.isSaving = false;
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+    this.{{ col.name | remove_id_suffix | to_camel_case }}Refs = [];
+{{~   end ~}}
+{{~ end ~}}
+  };
+}
+
+export const create{{ entity_name }}FormStore = () => new {{ entity_name }}FormStore();
+export default {{ entity_name }}FormStore;

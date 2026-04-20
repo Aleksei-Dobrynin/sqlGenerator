@@ -42,6 +42,15 @@ Return a JSON array of table schemas:
         ""ReferencesColumn"": ""id"",
         ""ConstraintName"": ""fk_constraint_name""
       }
+    ],
+    ""VirtualForeignKeys"": [
+      {
+        ""ColumnName"": ""inferred_fk_column"",
+        ""CSharpType"": ""int"",
+        ""ReferencesTable"": ""inferred_table"",
+        ""ReferencesColumn"": ""id"",
+        ""ConstraintName"": null
+      }
     ]
   }
 ]
@@ -89,6 +98,14 @@ Return a JSON array of table schemas:
 
 4. **Ignore**: Skip comments (--), GRANT statements, CREATE INDEX, etc.
 
+5. **Virtual Foreign Keys**: Populate `VirtualForeignKeys` array for columns that imply relationships by naming convention but have NO explicit REFERENCES:
+   - Naming patterns: `*_id` suffix (e.g. `user_id`), `id_*` prefix (e.g. `id_user`), `id*` prefix without separator (e.g. `iduser`)
+   - Skip columns already in `ForeignKeys` (explicit FK)
+   - Skip primary key columns
+   - Strip the id part to get candidate table name, then match against other parsed table names (try exact, plural +s, +es, y->ies)
+   - Use `ReferencesColumn: ""id""`, `ConstraintName: null`
+   - If no matching table found, do NOT add a virtual FK
+
 ## Example
 
 Input SQL:
@@ -104,6 +121,13 @@ CREATE TABLE orders (
     user_id INTEGER NOT NULL REFERENCES users(id),
     total NUMERIC(10,2)
 );
+
+CREATE TABLE reviews (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    reviewer_id INTEGER,
+    rating INTEGER NOT NULL
+);
 ```
 
 Output JSON:
@@ -117,7 +141,8 @@ Output JSON:
       {""Name"": ""email"", ""CSharpType"": ""string"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
       {""Name"": ""created_at"", ""CSharpType"": ""DateTime"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": true}
     ],
-    ""ForeignKeys"": []
+    ""ForeignKeys"": [],
+    ""VirtualForeignKeys"": []
   },
   {
     ""TableName"": ""orders"",
@@ -129,6 +154,22 @@ Output JSON:
     ],
     ""ForeignKeys"": [
       {""ColumnName"": ""user_id"", ""CSharpType"": ""int"", ""ReferencesTable"": ""users"", ""ReferencesColumn"": ""id"", ""ConstraintName"": null}
+    ],
+    ""VirtualForeignKeys"": []
+  },
+  {
+    ""TableName"": ""reviews"",
+    ""EntityName"": ""Reviews"",
+    ""Columns"": [
+      {""Name"": ""id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": true, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""order_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""reviewer_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": true},
+      {""Name"": ""rating"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false}
+    ],
+    ""ForeignKeys"": [],
+    ""VirtualForeignKeys"": [
+      {""ColumnName"": ""order_id"", ""CSharpType"": ""int"", ""ReferencesTable"": ""orders"", ""ReferencesColumn"": ""id"", ""ConstraintName"": null},
+      {""ColumnName"": ""reviewer_id"", ""CSharpType"": ""int"", ""ReferencesTable"": ""users"", ""ReferencesColumn"": ""id"", ""ConstraintName"": null}
     ]
   }
 ]

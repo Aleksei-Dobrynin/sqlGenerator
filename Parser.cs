@@ -78,10 +78,12 @@ namespace SQLFileGenerator
                 if (trimmedPart.StartsWith("CONSTRAINT", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                var column = ParseSingleColumn(trimmedPart);
+                var (column, foreignKey) = ParseSingleColumn(trimmedPart);
                 if (column != null)
                 {
                     tableSchema.Columns.Add(column);
+                    if (foreignKey != null)
+                        tableSchema.ForeignKeys.Add(foreignKey);
                     Console.WriteLine($"  Parsed column: {column.Name} ({column.CSharpType})"); // Debug
                 }
             }
@@ -132,12 +134,12 @@ namespace SQLFileGenerator
             return parts;
         }
 
-        private static ColumnSchema? ParseSingleColumn(string columnDefinition)
+        private static (ColumnSchema? Column, ForeignKeyInfo? ForeignKey) ParseSingleColumn(string columnDefinition)
         {
             // Удаляем лишние пробелы
             var parts = Regex.Split(columnDefinition.Trim(), @"\s+");
 
-            if (parts.Length < 2) return null;
+            if (parts.Length < 2) return (null, null);
 
             var columnName = parts[0].Trim('"');
             var dataType = parts[1];
@@ -153,7 +155,7 @@ namespace SQLFileGenerator
 
             var csharpType = MapPostgresToCSharpType(dataType);
 
-            return new ColumnSchema
+            var column = new ColumnSchema
             {
                 Name = columnName,
                 CSharpType = csharpType,
@@ -161,6 +163,22 @@ namespace SQLFileGenerator
                 IsForeignKey = isForeignKey,
                 IsNullable = isNullable
             };
+
+            ForeignKeyInfo? foreignKey = null;
+            if (isForeignKey)
+            {
+                var referencedTable = referencesMatch.Groups[1].Value;
+                var referencedColumn = referencesMatch.Groups[2].Success ? referencesMatch.Groups[2].Value : "id";
+                foreignKey = new ForeignKeyInfo
+                {
+                    ColumnName = columnName,
+                    CSharpType = csharpType,
+                    ReferencesTable = referencedTable,
+                    ReferencesColumn = referencedColumn
+                };
+            }
+
+            return (column, foreignKey);
         }
 
         private static void ProcessAlterTableForeignKeys(string sqlScript, Dictionary<string, TableSchema> tableDict, Regex alterTableFkRegex)

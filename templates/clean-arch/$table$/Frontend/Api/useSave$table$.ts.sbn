@@ -1,0 +1,14 @@
+{{~
+  route_name = entity_name | to_snake_case
+~}}
+import http from '@api/https';
+import type { I{{ entity_name }}SaveDto, I{{ entity_name }}DetailDto } from '@constants/DataModels/{{ entity_name }}/{{ entity_name }}Types';
+
+export const create{{ entity_name }} = async (dto: I{{ entity_name }}SaveDto): Promise<I{{ entity_name }}DetailDto> => {
+  const response = await http.http.post<I{{ entity_name }}DetailDto>('/api/{{ route_name }}s', dto);
+  return response.data;
+};
+
+export const update{{ entity_name }} = async (id: number, dto: I{{ entity_name }}SaveDto): Promise<void> => {
+  await http.http.put(`/api/{{ route_name }}s/${id}`, dto);
+};

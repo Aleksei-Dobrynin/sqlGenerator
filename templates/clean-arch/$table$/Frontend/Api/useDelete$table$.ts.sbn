@@ -1,0 +1,8 @@
+{{~
+  route_name = entity_name | to_snake_case
+~}}
+import http from '@api/https';
+
+export const delete{{ entity_name }} = async (id: number): Promise<void> => {
+  await http.http.delete(`/api/{{ route_name }}s/${id}`);
+};

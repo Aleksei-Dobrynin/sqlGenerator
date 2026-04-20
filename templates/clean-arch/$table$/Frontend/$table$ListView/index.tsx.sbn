@@ -1,0 +1,250 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_is_active = false
+  for col in columns
+    if col.name == "IsActive"; has_is_active = true; end
+  end
+
+  has_fk = false
+  for col in dto_columns
+    if col.is_foreign_key; has_fk = true; end
+  end
+
+  route_name = entity_name | to_snake_case
+  entity_camel = entity_name | to_camel_case
+
+  first_display_col = null
+  for col in dto_columns
+    if col.csharp_type == "string" && !col.is_foreign_key && first_display_col == null
+      first_display_col = col
+    end
+  end
+
+  # Count visible columns for colSpan
+  visible_col_count = 0
+  for col in dto_columns
+    visible_col_count = visible_col_count + 1
+  end
+  visible_col_count = visible_col_count + 1  # actions column
+~}}
+import { useEffect, useState } from 'react';
+import { observer } from 'mobx-react';
+import {
+  Box,
+  Button,
+{{~ if has_fk ~}}
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+{{~ end ~}}
+  IconButton,
+  InputAdornment,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import AddIcon from '@mui/icons-material/Add';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
+import type { ListEditMode } from '@constants/listView';
+import { create{{ entity_name }}ListStore } from './store';
+import {{ entity_name }}PopupForm from '../{{ entity_name }}AddEditView/popupForm';
+
+interface Props {
+  editMode?: ListEditMode;
+  idMain?: number;
+}
+
+const {{ entity_name }}ListView = observer(function {{ entity_name }}ListView({ editMode = 'popup', idMain }: Props) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [store] = useState(create{{ entity_name }}ListStore);
+
+  useEffect(() => {
+{{~ if has_fk ~}}
+    store.loadRefs();
+{{~ end ~}}
+    store.loadData();
+    return () => store.clearStore();
+  }, [store]);
+
+  const handleCreate = () => {
+    if (editMode === 'page') navigate('/user/{{ route_name }}s/create');
+    else store.openCreatePanel();
+  };
+
+  const handleEdit = (id: number) => {
+    if (editMode === 'page') navigate(`/user/{{ route_name }}s/${id}/edit`);
+    else store.openEditPanel(id);
+  };
+
+  return (
+    <Box sx={{ '{{' }} p: 3 {{ '}}' }}>
+      <Box sx={{ '{{' }} display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 {{ '}}' }}>
+        <Typography variant="h5" data-cy="{{ entity_camel }}-list-title">
+          {t('label:{{ entity_camel }}.title')}
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleCreate}
+          data-cy="{{ entity_camel }}-list-add-btn"
+        >
+          {t('common:add')}
+        </Button>
+      </Box>
+
+      <Box sx={{ '{{' }} mb: 2, display: 'flex', gap: 1, alignItems: 'center' {{ '}}' }}>
+        <TextField
+          size="small"
+          placeholder={t('common:search')}
+          value={store.searchField}
+          onChange={(e) => store.changeSearch(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && store.onSearchClicked()}
+          slotProps={{ '{{' }}
+            input: {
+              endAdornment: store.searchField ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={store.clearSearch} data-cy="{{ entity_camel }}-list-clear-search">
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : undefined,
+            },
+          {{ '}}' }}
+          data-cy="{{ entity_camel }}-list-search"
+        />
+        <IconButton onClick={store.onSearchClicked} data-cy="{{ entity_camel }}-list-search-btn">
+          <SearchIcon />
+        </IconButton>
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+
+        <FormControl size="small" sx={{ '{{' }} minWidth: 200 {{ '}}' }}>
+          <InputLabel>{t('label:{{ entity_camel }}.{{ col.name | remove_id_suffix | to_camel_case }}')}</InputLabel>
+          <Select
+            value={store.{{ col.name | to_camel_case }}Filter ?? ''}
+            onChange={(e) => store.set{{ col.name | remove_id_suffix }}Filter(e.target.value ? Number(e.target.value) : null)}
+            label={t('label:{{ entity_camel }}.{{ col.name | remove_id_suffix | to_camel_case }}')}
+            data-cy="{{ entity_camel }}-list-{{ col.name | to_camel_case }}-filter"
+          >
+            <MenuItem value="">{t('common:all')}</MenuItem>
+            {store.{{ col.name | remove_id_suffix | to_camel_case }}Refs.map((ref) => (
+              <MenuItem key={ref.id} value={ref.id}>{ref.displayName}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+{{~   end ~}}
+{{~ end ~}}
+      </Box>
+
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+              <TableCell>{t('label:{{ entity_camel }}.{{ col.name | remove_id_suffix | to_camel_case }}')}</TableCell>
+{{~   else ~}}
+              <TableCell>{t('label:{{ entity_camel }}.{{ col.name | to_camel_case }}')}</TableCell>
+{{~   end ~}}
+{{~ end ~}}
+              <TableCell align="right">{t('common:actions')}</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {store.data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={ {{ visible_col_count }}} align="center">
+                  <Typography variant="body2" color="text.secondary" sx={{ '{{' }} py: 4 {{ '}}' }}>
+                    {t('common:noData')}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              store.data.map((row) => (
+                <TableRow key={row.id} hover data-cy={`{{ entity_camel }}-list-row-${row.id}`}>
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+                  <TableCell>{row.{{ col.name | remove_id_suffix | to_camel_case }}DisplayName ?? ''}</TableCell>
+{{~   else if col.csharp_type == "bool" ~}}
+                  <TableCell>{row.{{ col.name | to_camel_case }} ? t('common:yes') : t('common:no')}</TableCell>
+{{~   else if col.is_nullable ~}}
+                  <TableCell>{row.{{ col.name | to_camel_case }} ?? ''}</TableCell>
+{{~   else ~}}
+                  <TableCell>{row.{{ col.name | to_camel_case }}}</TableCell>
+{{~   end ~}}
+{{~ end ~}}
+                  <TableCell align="right">
+                    <Tooltip title={t('common:edit')}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEdit(row.id)}
+                        data-cy={`{{ entity_camel }}-list-edit-${row.id}`}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={t('common:delete')}>
+                      <IconButton
+                        size="small"
+{{~ if first_display_col ~}}
+                        onClick={() => store.deleteItem(row.id, row.{{ first_display_col.name | to_camel_case }})}
+{{~ else ~}}
+                        onClick={() => store.deleteItem(row.id, String(row.id))}
+{{~ end ~}}
+                        data-cy={`{{ entity_camel }}-list-delete-${row.id}`}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+        <TablePagination
+          component="div"
+          count={store.total}
+          page={store.page}
+          onPageChange={(_e, page) => store.setPage(page)}
+          rowsPerPage={store.pageSize}
+          onRowsPerPageChange={(e) => store.setPageSize(Number(e.target.value))}
+          rowsPerPageOptions={[10, 25, 50]}
+          data-cy="{{ entity_camel }}-list-pagination"
+        />
+      </TableContainer>
+
+      {editMode === 'popup' && (
+        <{{ entity_name }}PopupForm
+          openPanel={store.openPanel}
+          id={store.currentId}
+          onBtnCancelClick={store.closePanel}
+          onSaveClick={store.onPanelSaved}
+        />
+      )}
+    </Box>
+  );
+});
+
+export default {{ entity_name }}ListView;
