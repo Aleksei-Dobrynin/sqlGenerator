@@ -31,7 +31,7 @@ Parse a PostgreSQL SQL file using regex. Fast, works for simple DDL.
 
 **Returns:** `{ success, tableCount, tables[], schemaFile }`
 
-**Limitations:** Regex parser. May fail on complex DDL with advanced constraints, comments inside column definitions, or non-standard syntax. For complex SQL, use the agent-parsing workflow instead.
+**Limitations:** Regex parser. Tolerates SQL line/block comments and multi-word types (`timestamp with time zone`, `double precision`, `character varying`). May still fail on advanced DDL: partitioning, INHERITS, exclusion constraints, expression indexes. For complex SQL, use the agent-parsing workflow instead.
 
 ### SaveSchema
 
@@ -42,7 +42,9 @@ Validate and save a schema JSON file parsed by the agent.
 | `schemaFilePath` | yes | Path to JSON file with table schema array |
 | `outputPath` | no | Output path for validated schema (default: `schema.json`) |
 
-**Returns:** `{ success, tableCount, tables[], schemaFile }`
+**Returns:** `{ success, tableCount, tables[], schemaFile, warnings[]? }`
+
+**Validation:** runs `LlmResponseValidator` over the input JSON. Returns `success: false` with an error summary on critical issues (empty TableName, missing PK, duplicate column names, FK column not present in table, invalid C# type). Non-blocking issues (non-PascalCase EntityName, non-standard type, FK referencing table outside the result set) are surfaced in `warnings[]`.
 
 ### GenerateFiles
 
@@ -156,6 +158,21 @@ Agent -> ParseSql(sqlFilePath) -> GenerateFiles(schemaFile, outputDir, presetNam
 
 **Note:** `VirtualForeignKeys` contains relationships inferred from column naming conventions (`*_id`, `id_*`, `id*` patterns) when no explicit `REFERENCES` exists. Populated when `includeVirtualFks` is `true`.
 
+**Idempotency:** `VirtualForeignKeyResolver` is idempotent. If the agent has already populated `VirtualForeignKeys` following the `sql_parsing_instructions` prompt, the resolver only fills in missing entries (e.g. cross-chunk cases for the LLM parser) and never produces duplicates. Templates rely on uniqueness in this array — duplicates would generate duplicate `DisplayName` properties and fail compilation.
+
+**System fields:** SaaS templates (clean-arch preset) expect specific column names with semantic meaning. Always preserve them:
+
+| Column | Purpose |
+|--------|---------|
+| `tenant_id` (int, NOT NULL) | Multi-tenancy isolation. Excluded from create/update DTOs. |
+| `is_active` (bool, NOT NULL) | Activation flag. Enables `Activate/Deactivate()` methods on entity. |
+| `is_deleted` (bool, NOT NULL) | Soft-delete flag. Enables `ISoftDeletable` + `Delete()` method. |
+| `created_at`, `updated_at` (timestamptz, NOT NULL) | Audit timestamps. Must be `DateTimeOffset`, not `DateTime`. |
+| `created_by`, `updated_by` (int, nullable) | Audit user IDs. |
+| `deleted_at` (timestamptz), `deleted_by` (int) | Soft-delete audit. Optional, paired with `is_deleted`. |
+
+The agent must include these in `Columns` array with correct types/nullability if they exist in SQL. Templates detect them by name and gate audit/soft-delete/tenant logic on their presence.
+
 ## Type Mapping (PostgreSQL to C#)
 
 | PostgreSQL | C# |
@@ -165,12 +182,15 @@ Agent -> ParseSql(sqlFilePath) -> GenerateFiles(schemaFile, outputDir, presetNam
 | smallint, int2 | short |
 | serial | int |
 | bigserial | long |
+| smallserial | short |
 | boolean, bool | bool |
-| varchar, character varying, text, char | string |
+| varchar, character varying, text, char, character | string |
 | decimal, numeric, money | decimal |
 | real, float4 | float |
 | double precision, float8 | double |
-| date, timestamp, timestamptz, timestamp with time zone | DateTime |
+| date, timestamp, timestamp without time zone | DateTime |
+| timestamptz, timestamp with time zone | DateTimeOffset |
+| time, time without time zone | TimeSpan |
 | uuid | Guid |
 | json, jsonb | string |
 | bytea | byte[] |

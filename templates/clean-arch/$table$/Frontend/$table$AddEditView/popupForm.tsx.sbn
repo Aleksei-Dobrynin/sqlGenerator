@@ -3,15 +3,7 @@
 ~}}
 import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react';
-import {
-  Box,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  CircularProgress,
-} from '@mui/material';
+import { Box, FormDialog } from '@ui-kit';
 import { useTranslation } from 'react-i18next';
 import { create{{ entity_name }}FormStore } from './store';
 import {{ entity_name }}AddEditBase from './base';
@@ -46,42 +38,28 @@ const {{ entity_name }}PopupForm = observer(function {{ entity_name }}PopupForm(
   };
 
   return (
-    <Dialog
+    <FormDialog
       open={openPanel}
       onClose={handleCancel}
+      title={id ? t('label:{{ entity_camel }}.edit{{ entity_name }}') : t('label:{{ entity_camel }}.new{{ entity_name }}')}
+      onSave={() => store.onSaveClick(() => onSaveClick())}
+      isSaving={store.isSaving}
+      saveLabel={t('common:save')}
+      cancelLabel={t('common:cancel')}
       maxWidth="xl"
-      fullWidth
-      data-cy="{{ entity_camel }}-popup-form"
+      dataCy="{{ entity_camel }}-popup"
     >
-      <DialogTitle>
-        {id ? t('label:{{ entity_camel }}.edit{{ entity_name }}') : t('label:{{ entity_camel }}.new{{ entity_name }}')}
-      </DialogTitle>
-      <DialogContent sx={{ '{{' }} pt: 2 {{ '}}' }}>
-        <Box sx={{ '{{' }} display: 'flex', gap: 2 {{ '}}' }}>
-          <Box sx={{ '{{' }} flex: 1, minWidth: 0 {{ '}}' }}>
-            <{{ entity_name }}AddEditBase store={store} />
-          </Box>
-          {store.id && (
-            <Box sx={{ '{{' }} flex: 1, minWidth: 0, borderLeft: 1, borderColor: 'divider', pl: 2 {{ '}}' }}>
-              <{{ entity_name }}MtmTabs {{ entity_camel }}Id={store.id} editMode="popup" orientation="horizontal" />
-            </Box>
-          )}
+      <Box sx={{ '{{' }} display: 'flex', gap: 2 {{ '}}' }}>
+        <Box sx={{ '{{' }} flex: 1, minWidth: 0 {{ '}}' }}>
+          <{{ entity_name }}AddEditBase store={store} />
         </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleCancel} data-cy="{{ entity_camel }}-popup-cancel-btn">
-          {t('common:cancel')}
-        </Button>
-        <Button
-          variant="contained"
-          onClick={() => store.onSaveClick(() => onSaveClick())}
-          disabled={store.isSaving}
-          data-cy="{{ entity_camel }}-popup-save-btn"
-        >
-          {store.isSaving ? <CircularProgress size={20} /> : t('common:save')}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        {store.id && (
+          <Box sx={{ '{{' }} flex: 1, minWidth: 0, borderLeft: 1, borderColor: 'divider', pl: 2 {{ '}}' }}>
+            <{{ entity_name }}MtmTabs {{ entity_camel }}Id={store.id} editMode="popup" orientation="horizontal" />
+          </Box>
+        )}
+      </Box>
+    </FormDialog>
   );
 });
 

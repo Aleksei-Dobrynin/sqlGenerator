@@ -1,5 +1,6 @@
 using ModelContextProtocol.Server;
 using SQLFileGenerator;
+using SQLFileGenerator.LlmParser;
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -97,6 +98,19 @@ public class SqlGeneratorTools
 
             // Validate JSON
             var schemaJson = File.ReadAllText(fullSchemaPath);
+
+            // Семантическая валидация: дубли колонок, отсутствие PK, нестандартные типы, FK-консистентность
+            var validator = new LlmResponseValidator();
+            var validation = validator.Validate(schemaJson);
+            if (!validation.IsValid)
+            {
+                return new SaveSchemaResult
+                {
+                    Success = false,
+                    Error = validation.GetErrorSummary()
+                };
+            }
+
             var tables = JsonSerializer.Deserialize<List<TableSchema>>(schemaJson, JsonOptions);
 
             if (tables == null || tables.Count == 0)
@@ -118,7 +132,8 @@ public class SqlGeneratorTools
                 Success = true,
                 TableCount = tables.Count,
                 TableNames = tables.Select(t => t.EntityName).ToArray(),
-                SchemaFile = fullPath
+                SchemaFile = fullPath,
+                Warnings = validation.Warnings.Count > 0 ? validation.Warnings.ToArray() : null
             };
         }
         catch (JsonException ex)
@@ -386,6 +401,10 @@ public class SaveSchemaResult
     [JsonPropertyName("schemaFile")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? SchemaFile { get; set; }
+
+    [JsonPropertyName("warnings")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string[]? Warnings { get; set; }
 
     [JsonPropertyName("error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

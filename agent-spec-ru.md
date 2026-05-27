@@ -31,7 +31,7 @@
 
 **Возвращает:** `{ success, tableCount, tables[], schemaFile }`
 
-**Ограничения:** Regex-парсер. Может не справиться со сложным DDL с комментариями внутри определений колонок или нестандартным синтаксисом. Для сложного SQL используйте workflow с парсингом агентом.
+**Ограничения:** Regex-парсер. Корректно обрабатывает SQL-комментарии (`-- ...`, `/* ... */`) и multi-word типы (`timestamp with time zone`, `double precision`, `character varying`). Всё ещё ограничен в продвинутых DDL: партиционирование, INHERITS, exclusion constraints, expression-индексы. Для сложного SQL используйте workflow с парсингом агентом.
 
 ### SaveSchema
 
@@ -42,7 +42,9 @@
 | `schemaFilePath` | да | Путь к JSON файлу с массивом таблиц |
 | `outputPath` | нет | Путь для валидированной схемы (по умолчанию: `schema.json`) |
 
-**Возвращает:** `{ success, tableCount, tables[], schemaFile }`
+**Возвращает:** `{ success, tableCount, tables[], schemaFile, warnings[]? }`
+
+**Валидация:** запускается `LlmResponseValidator` на исходном JSON. Возвращает `success: false` с описанием ошибки при критических проблемах (пустой TableName, нет PK, дублирующиеся имена колонок, FK-колонка отсутствует в таблице, невалидный C#-тип). Нефатальные замечания (EntityName не в PascalCase, нестандартный тип, FK ссылается вне result set) попадают в `warnings[]`.
 
 ### GenerateFiles
 
@@ -156,6 +158,21 @@ Agent -> ParseSql(sqlFilePath) -> GenerateFiles(schemaFile, outputDir, presetNam
 
 **Примечание:** `VirtualForeignKeys` содержит связи, выведенные из конвенций именования колонок (`*_id`, `id_*`, `id*`), когда нет явного `REFERENCES`. Заполняется при `includeVirtualFks: true`.
 
+**Идемпотентность:** `VirtualForeignKeyResolver` идемпотентен. Если агент уже заполнил `VirtualForeignKeys` по инструкции из `sql_parsing_instructions`, резолвер только дополняет недостающие записи (например, cross-chunk случаи для LLM-парсера) и не создаёт дубликаты. Шаблоны полагаются на уникальность в этом массиве — дубликаты сгенерируют дублирующиеся свойства `DisplayName` и сломают компиляцию.
+
+**Системные поля:** SaaS-шаблоны (пресет clean-arch) ожидают конкретные имена колонок с семантическим значением. Всегда сохраняйте их:
+
+| Колонка | Назначение |
+|---------|------------|
+| `tenant_id` (int, NOT NULL) | Multi-tenancy. Исключается из create/update DTO. |
+| `is_active` (bool, NOT NULL) | Флаг активности. Активирует методы `Activate/Deactivate()` на сущности. |
+| `is_deleted` (bool, NOT NULL) | Флаг soft-delete. Активирует `ISoftDeletable` + метод `Delete()`. |
+| `created_at`, `updated_at` (timestamptz, NOT NULL) | Audit timestamps. Должны быть `DateTimeOffset`, не `DateTime`. |
+| `created_by`, `updated_by` (int, nullable) | Audit user IDs. |
+| `deleted_at` (timestamptz), `deleted_by` (int) | Audit soft-delete. Опционально, парные с `is_deleted`. |
+
+Агент должен включать эти поля в массив `Columns` с корректными типами/nullability, если они есть в SQL. Шаблоны определяют их по имени и включают audit/soft-delete/tenant-логику только при их наличии.
+
 ## Маппинг типов (PostgreSQL -> C#)
 
 | PostgreSQL | C# |
@@ -165,12 +182,15 @@ Agent -> ParseSql(sqlFilePath) -> GenerateFiles(schemaFile, outputDir, presetNam
 | smallint, int2 | short |
 | serial | int |
 | bigserial | long |
+| smallserial | short |
 | boolean, bool | bool |
-| varchar, character varying, text, char | string |
+| varchar, character varying, text, char, character | string |
 | decimal, numeric, money | decimal |
 | real, float4 | float |
 | double precision, float8 | double |
-| date, timestamp, timestamptz, timestamp with time zone | DateTime |
+| date, timestamp, timestamp without time zone | DateTime |
+| timestamptz, timestamp with time zone | DateTimeOffset |
+| time, time without time zone | TimeSpan |
 | uuid | Guid |
 | json, jsonb | string |
 | bytea | byte[] |

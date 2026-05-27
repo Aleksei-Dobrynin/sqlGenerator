@@ -1,16 +1,19 @@
 {{~
   dto_columns = []
   for col in editable_columns
-    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+    if col.name != "tenant_id" && col.name != "is_active" && col.name != "is_deleted"
       dto_columns = dto_columns | array.add col
     end
   end
 
   has_is_active = false
+  has_is_deleted = false
   for col in columns
-    if col.name == "IsActive"
+    if col.name == "is_active"
       has_is_active = true
-      break
+    end
+    if col.name == "is_deleted"
+      has_is_deleted = true
     end
   end
 ~}}
@@ -62,7 +65,7 @@ public class {{ entity_name }}Service : I{{ entity_name }}Service
 
     public async Task<{{ entity_name }}DetailDto> Create(Create{{ entity_name }}Dto dto, int tenantId, int currentUserId, string lang)
     {
-        // TODO: Добавьте бизнес-правила перед Create если нужно
+        // TODO: Добавьте бизнес-правила (BusinessRuleValidator) если нужно
         int id;
         await _uow.BeginAsync();
         try
@@ -70,7 +73,7 @@ public class {{ entity_name }}Service : I{{ entity_name }}Service
             var entity = {{ entity_name }}.Create(
                 tenantId: tenantId,
 {{~ for col in dto_columns ~}}
-                {{ col.name | to_camel_case }}: dto.{{ col.name }},
+                {{ col.name | to_camel_case }}: dto.{{ col.name | to_pascal_case }},
 {{~ end ~}}
                 createdBy: currentUserId);
 
@@ -88,7 +91,7 @@ public class {{ entity_name }}Service : I{{ entity_name }}Service
 
     public async Task<{{ entity_name }}DetailDto> Update(int id, Update{{ entity_name }}Dto dto, int tenantId, int currentUserId, string lang)
     {
-        // TODO: Добавьте бизнес-правила перед Update если нужно
+        // TODO: Добавьте бизнес-правила (BusinessRuleValidator) если нужно
         await _uow.BeginAsync();
         try
         {
@@ -97,7 +100,7 @@ public class {{ entity_name }}Service : I{{ entity_name }}Service
 
             entity.Update(
 {{~ for col in dto_columns ~}}
-                {{ col.name | to_camel_case }}: dto.{{ col.name }},
+                {{ col.name | to_camel_case }}: dto.{{ col.name | to_pascal_case }},
 {{~ end ~}}
                 updatedBy: currentUserId);
 
@@ -113,7 +116,7 @@ public class {{ entity_name }}Service : I{{ entity_name }}Service
         return await GetById(id, tenantId, lang);
     }
 
-    public async Task Delete(int id, int tenantId)
+    public async Task Delete(int id, int tenantId, int currentUserId)
     {
         await _uow.BeginAsync();
         try
@@ -121,18 +124,31 @@ public class {{ entity_name }}Service : I{{ entity_name }}Service
             var entity = await _repo.GetEntityById(id, tenantId, _uow)
                 ?? throw new EntityNotFoundException("{{ entity_name }}", id);
 
-{{~ if has_is_active ~}}
-            entity.Deactivate();
-            await _repo.Update(entity, _uow);
-{{~ else ~}}
-            // TODO: Реализуйте логику удаления
+{{~ if has_is_deleted ~}}
+            entity.Delete(currentUserId);
+{{~ else if has_is_active ~}}
+            entity.Deactivate(currentUserId);
 {{~ end ~}}
+            await _repo.Update(entity, _uow);
             await _uow.CommitAsync();
         }
         catch
         {
             await _uow.RollbackAsync();
             throw;
+        }
+    }
+
+    public async Task<IEnumerable<{{ entity_name }}LookupDto>> Lookup(string? search, int tenantId)
+    {
+        await _uow.BeginAsync();
+        try
+        {
+            return await _repo.Lookup(search, tenantId, _uow);
+        }
+        finally
+        {
+            await _uow.RollbackAsync();
         }
     }
 }

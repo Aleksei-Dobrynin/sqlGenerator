@@ -1,7 +1,7 @@
 {{~
   dto_columns = []
   for col in editable_columns
-    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+    if col.name != "tenant_id" && col.name != "is_active" && col.name != "is_deleted"
       dto_columns = dto_columns | array.add col
     end
   end
@@ -11,6 +11,12 @@
   for col in dto_columns
     if col.csharp_type == "DateTime"; has_datetime = true; end
     if col.is_foreign_key; has_fk = true; end
+  end
+
+  has_vfk = virtual_foreign_keys | array.size > 0
+  vfk_col_names = []
+  for vfk in virtual_foreign_keys
+    vfk_col_names = vfk_col_names | array.add vfk.column_name
   end
 
   route_name = entity_name | to_snake_case
@@ -26,19 +32,31 @@ import i18n from 'i18next';
 import { get{{ entity_name }} } from '@api/{{ entity_name }}/useGet{{ entity_name }}';
 import { create{{ entity_name }}, update{{ entity_name }} } from '@api/{{ entity_name }}/useSave{{ entity_name }}';
 import type { I{{ entity_name }}SaveDto } from '@constants/DataModels/{{ entity_name }}/{{ entity_name }}Types';
-{{~ if has_fk ~}}
-import type { IRefOption } from '@constants/DataModels/Organization/CompanyTypes';
+{{~ if has_fk || has_vfk ~}}
+import type { IRefOption } from '@constants/types';
+{{~ end ~}}
+{{~ for col in dto_columns ~}}
+{{~   if col.is_foreign_key ~}}
+import { get{{ col.name | remove_id_suffix | to_pascal_case }}Lookup } from '@api/{{ col.name | remove_id_suffix | to_pascal_case }}/useGet{{ col.name | remove_id_suffix | to_pascal_case }}Lookup';
+{{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+import { get{{ vfk.references_table | to_pascal_case }}Lookup } from '@api/{{ vfk.references_table | to_pascal_case }}/useGet{{ vfk.references_table | to_pascal_case }}Lookup';
 {{~ end ~}}
 import { validate } from './valid';
 
 class {{ entity_name }}FormStore {
   id: number | null = null;
 {{~ for col in dto_columns ~}}
+{{~   is_fk_col = col.is_foreign_key
+      if !is_fk_col
+        is_fk_col = vfk_col_names | array.contains col.name
+      end ~}}
 {{~   if col.csharp_type == "string" && !col.is_nullable ~}}
   {{ col.name | to_camel_case }} = '';
 {{~   else if col.csharp_type == "string" && col.is_nullable ~}}
   {{ col.name | to_camel_case }}: string | null = null;
-{{~   else if (col.csharp_type == "int" || col.csharp_type == "long") && col.is_foreign_key ~}}
+{{~   else if (col.csharp_type == "int" || col.csharp_type == "long") && is_fk_col ~}}
   {{ col.name | to_camel_case }}: number | null = null;
 {{~   else if (col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal") && col.is_nullable ~}}
   {{ col.name | to_camel_case }}: number | null = null;
@@ -60,6 +78,9 @@ class {{ entity_name }}FormStore {
   {{ col.name | remove_id_suffix | to_camel_case }}Refs: IRefOption[] = [];
 {{~   end ~}}
 {{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+  {{ vfk.column_name | remove_id_suffix | to_camel_case }}Refs: IRefOption[] = [];
+{{~ end ~}}
 
   constructor() {
     makeAutoObservable(this);
@@ -70,7 +91,7 @@ class {{ entity_name }}FormStore {
     (this as any)[name] = value;
     validate(name, this);
   };
-{{~ if has_fk ~}}
+{{~ if has_fk || has_vfk ~}}
 
   handleSelectChange = (name: string, value: number | string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,13 +102,15 @@ class {{ entity_name }}FormStore {
 
   async loadRefs() {
     try {
-{{~ if has_fk ~}}
-      const [{{ for col in dto_columns }}{{ if col.is_foreign_key }}{{ col.name | remove_id_suffix | to_camel_case }}Result{{ if !for.last }}, {{ end }}{{ end }}{{ end }}] = await Promise.all([
+{{~ if has_fk || has_vfk ~}}
+      const [{{ for col in dto_columns }}{{ if col.is_foreign_key }}{{ col.name | remove_id_suffix | to_camel_case }}Result, {{ end }}{{ end }}{{ for vfk in virtual_foreign_keys }}{{ vfk.column_name | remove_id_suffix | to_camel_case }}Result, {{ end }}] = await Promise.all([
 {{~   for col in dto_columns ~}}
 {{~     if col.is_foreign_key ~}}
-        // TODO: Заменить на реальный API-вызов для {{ col.name | remove_id_suffix }}
-        Promise.resolve([] as IRefOption[]),
+        get{{ col.name | remove_id_suffix | to_pascal_case }}Lookup(),
 {{~     end ~}}
+{{~   end ~}}
+{{~   for vfk in virtual_foreign_keys ~}}
+        get{{ vfk.references_table | to_pascal_case }}Lookup(),
 {{~   end ~}}
       ]);
       runInAction(() => {
@@ -95,6 +118,9 @@ class {{ entity_name }}FormStore {
 {{~     if col.is_foreign_key ~}}
         this.{{ col.name | remove_id_suffix | to_camel_case }}Refs = {{ col.name | remove_id_suffix | to_camel_case }}Result;
 {{~     end ~}}
+{{~   end ~}}
+{{~   for vfk in virtual_foreign_keys ~}}
+        this.{{ vfk.column_name | remove_id_suffix | to_camel_case }}Refs = {{ vfk.column_name | remove_id_suffix | to_camel_case }}Result;
 {{~   end ~}}
       });
 {{~ end ~}}
@@ -175,11 +201,15 @@ class {{ entity_name }}FormStore {
   clearStore = () => {
     this.id = null;
 {{~ for col in dto_columns ~}}
+{{~   is_fk_col = col.is_foreign_key
+      if !is_fk_col
+        is_fk_col = vfk_col_names | array.contains col.name
+      end ~}}
 {{~   if col.csharp_type == "string" && !col.is_nullable ~}}
     this.{{ col.name | to_camel_case }} = '';
 {{~   else if col.csharp_type == "string" && col.is_nullable ~}}
     this.{{ col.name | to_camel_case }} = null;
-{{~   else if (col.csharp_type == "int" || col.csharp_type == "long") && col.is_foreign_key ~}}
+{{~   else if (col.csharp_type == "int" || col.csharp_type == "long") && is_fk_col ~}}
     this.{{ col.name | to_camel_case }} = null;
 {{~   else if (col.csharp_type == "int" || col.csharp_type == "long" || col.csharp_type == "decimal") && col.is_nullable ~}}
     this.{{ col.name | to_camel_case }} = null;
@@ -198,6 +228,9 @@ class {{ entity_name }}FormStore {
 {{~   if col.is_foreign_key ~}}
     this.{{ col.name | remove_id_suffix | to_camel_case }}Refs = [];
 {{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+    this.{{ vfk.column_name | remove_id_suffix | to_camel_case }}Refs = [];
 {{~ end ~}}
   };
 }

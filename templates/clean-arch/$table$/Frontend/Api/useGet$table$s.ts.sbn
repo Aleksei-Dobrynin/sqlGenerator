@@ -1,14 +1,14 @@
 {{~
   dto_columns = []
   for col in editable_columns
-    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+    if col.name != "tenant_id" && col.name != "is_active" && col.name != "is_deleted"
       dto_columns = dto_columns | array.add col
     end
   end
 
   has_is_active = false
   for col in columns
-    if col.name == "IsActive"; has_is_active = true; end
+    if col.name == "is_active"; has_is_active = true; end
   end
 
   has_fk = false
@@ -34,6 +34,9 @@ export const get{{ entity_name }}s = async (params: {
 {{~   if col.is_foreign_key ~}}
   {{ col.name | to_camel_case }}?: number;
 {{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+  {{ vfk.column_name | to_camel_case }}?: number;
 {{~ end ~}}
 }): Promise<IPagedResult<I{{ entity_name }}ListDto>> => {
   const response = await http.http.get<IPagedResult<I{{ entity_name }}ListDto>>('/api/{{ route_name }}s', { params });

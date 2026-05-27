@@ -17,6 +17,22 @@
     <Compile Remove="SqlGenerator.Mcp\**" />
     <EmbeddedResource Remove="SqlGenerator.Mcp\**" />
     <None Remove="SqlGenerator.Mcp\**" />
+    <!-- Exclude generator output directories so generated .cs files do not enter compilation -->
+    <Compile Remove="result\**" />
+    <EmbeddedResource Remove="result\**" />
+    <None Remove="result\**" />
+    <Compile Remove="test_output\**" />
+    <EmbeddedResource Remove="test_output\**" />
+    <None Remove="test_output\**" />
+    <Compile Remove="scaffold_check\**" />
+    <EmbeddedResource Remove="scaffold_check\**" />
+    <None Remove="scaffold_check\**" />
+    <Compile Remove="verify_regex\**" />
+    <EmbeddedResource Remove="verify_regex\**" />
+    <None Remove="verify_regex\**" />
+    <Compile Remove="verify_llm\**" />
+    <EmbeddedResource Remove="verify_llm\**" />
+    <None Remove="verify_llm\**" />
   </ItemGroup>
 
   <ItemGroup>

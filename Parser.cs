@@ -23,6 +23,12 @@ namespace SQLFileGenerator
         {
             var tables = new List<TableSchema>();
 
+            // Strip SQL comments before regex matching:
+            // - line comments `-- ...` склеиваются с соседней колонкой при normalizeWhitespace и ломают парсинг
+            // - block comments `/* ... */` мешают аналогично; убираем оба варианта
+            sqlScript = Regex.Replace(sqlScript, @"/\*.*?\*/", "", RegexOptions.Singleline);
+            sqlScript = Regex.Replace(sqlScript, @"--[^\r\n]*", "");
+
             // Регулярное выражение для поиска CREATE TABLE блоков
             var tableRegex = new Regex(@"CREATE\s+TABLE\s+([\w.]+)\s*\((.+?)\);", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
@@ -144,6 +150,39 @@ namespace SQLFileGenerator
             var columnName = parts[0].Trim('"');
             var dataType = parts[1];
 
+            // Склеиваем multi-word типы PostgreSQL: `timestamp with time zone`, `double precision`,
+            // `character varying` и т.п. Иначе тип определяется только по первому слову и
+            // `timestamp with time zone` ошибочно маппится в `DateTime` вместо `DateTimeOffset`.
+            if (parts.Length >= 3)
+            {
+                var twoWord = (parts[1] + " " + parts[2]).ToLowerInvariant();
+                var twoWordKnown = new HashSet<string>
+                {
+                    "double precision",
+                    "character varying",
+                    "bit varying",
+                    "time without",
+                    "time with",
+                    "timestamp without",
+                    "timestamp with"
+                };
+                if (twoWordKnown.Contains(twoWord))
+                {
+                    if (parts.Length >= 5 &&
+                        (parts[2].Equals("without", StringComparison.OrdinalIgnoreCase) ||
+                         parts[2].Equals("with", StringComparison.OrdinalIgnoreCase)) &&
+                        parts[3].Equals("time", StringComparison.OrdinalIgnoreCase) &&
+                        parts[4].Equals("zone", StringComparison.OrdinalIgnoreCase))
+                    {
+                        dataType = parts[1] + " " + parts[2] + " " + parts[3] + " " + parts[4];
+                    }
+                    else
+                    {
+                        dataType = parts[1] + " " + parts[2];
+                    }
+                }
+            }
+
             // Проверяем атрибуты
             var upperDefinition = columnDefinition.ToUpper();
             var isNullable = !upperDefinition.Contains("NOT NULL");
@@ -226,20 +265,32 @@ namespace SQLFileGenerator
         /// <returns>Строка, представляющая соответствующий тип C#</returns>
         private static string MapPostgresToCSharpType(string postgresType)
         {
-            return postgresType.ToLower() switch
+            // Strip size/precision parameters: varchar(255) → varchar, numeric(10,2) → numeric
+            var baseType = postgresType.Contains('(')
+                ? postgresType[..postgresType.IndexOf('(')].Trim()
+                : postgresType;
+
+            return baseType.ToLower() switch
             {
-                "integer" => "int",
+                "integer" or "int" or "int4" => "int",
                 "serial" => "int",
-                "bigint" => "long",
+                "bigint" or "int8" => "long",
                 "bigserial" => "long",
+                "smallint" or "int2" => "short",
+                "smallserial" => "short",
                 "text" => "string",
-                "varchar" or "character varying" => "string",
-                "boolean" => "bool",
+                "varchar" or "character varying" or "char" or "character" => "string",
+                "boolean" or "bool" => "bool",
                 "timestamp" or "timestamp without time zone" => "DateTime",
+                "timestamp with time zone" or "timestamptz" => "DateTimeOffset",
                 "date" => "DateTime",
-                "real" => "float",
-                "double precision" => "double",
-                "numeric" or "decimal" => "decimal",
+                "time" or "time without time zone" => "TimeSpan",
+                "real" or "float4" => "float",
+                "double precision" or "float8" => "double",
+                "numeric" or "decimal" or "money" => "decimal",
+                "uuid" => "Guid",
+                "bytea" => "byte[]",
+                "json" or "jsonb" => "string",
                 _ => "object" // Default type for unmapped types
             };
         }

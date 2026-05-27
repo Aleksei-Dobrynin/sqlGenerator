@@ -74,12 +74,21 @@ namespace SQLFileGenerator
                 }
             }
 
+            // Идемпотентность: если входная схема уже содержит VirtualForeignKeys
+            // (заполнено LLM/agent по их промпту), не добавляем дубликаты.
+            var existingVfkColumns = new HashSet<string>(
+                table.VirtualForeignKeys.Select(vfk => vfk.ColumnName),
+                StringComparer.OrdinalIgnoreCase);
+
             foreach (var column in table.Columns)
             {
                 if (column.IsPrimaryKey)
                     continue;
 
                 if (explicitFkColumns.Contains(column.Name))
+                    continue;
+
+                if (existingVfkColumns.Contains(column.Name))
                     continue;
 
                 var candidate = ExtractCandidate(column.Name);

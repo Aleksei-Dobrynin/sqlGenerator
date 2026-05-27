@@ -9,5 +9,6 @@ public interface I{{ entity_name }}Service
     Task<{{ entity_name }}DetailDto> GetById(int id, int tenantId, string lang);
     Task<{{ entity_name }}DetailDto> Create(Create{{ entity_name }}Dto dto, int tenantId, int currentUserId, string lang);
     Task<{{ entity_name }}DetailDto> Update(int id, Update{{ entity_name }}Dto dto, int tenantId, int currentUserId, string lang);
-    Task Delete(int id, int tenantId);
+    Task Delete(int id, int tenantId, int currentUserId);
+    Task<IEnumerable<{{ entity_name }}LookupDto>> Lookup(string? search, int tenantId);
 }

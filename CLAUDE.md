@@ -2,6 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## LLMWiki — shared knowledge vault
+
+Personal Obsidian-based knowledge vault at **`$OBSIDIAN_VAULT`** (= `D:\Practice\LLMWiki`). Holds architectural context for this and sibling projects.
+
+### When to read (before non-trivial work)
+
+- `$OBSIDIAN_VAULT/projects/sql-generator/index.md` — MOC: stack, parser variants (regex/LLM), template system overview
+- `$OBSIDIAN_VAULT/projects/sql-generator/architecture.md` — компоненты, потоки, template helpers
+- `$OBSIDIAN_VAULT/projects/sql-generator/decisions/` — ADR'ы (ADR-0001 dual-parsing strategy, ADR-0002 virtual FK inference, ADR-0003 MCP token economy)
+- `$OBSIDIAN_VAULT/projects/sql-generator/runbooks/` — quick-start
+
+### Related projects in the vault
+
+Сейчас sql-generator изолированный — кросс-проектных связей нет. Если появится потребитель (например, saas-boilerplate начнёт генерить entities через MCP), отметить здесь и в `projects/sql-generator/index.md`.
+
+### When to write (back to the vault) — follow the agent playbooks
+
+The vault has explicit, step-by-step procedures. **Read the relevant playbook before writing — don't improvise.**
+
+- `$OBSIDIAN_VAULT/_meta/triggers.md` — **start here.** Flat map: "this happened in code → do that in the wiki (or nothing)". Explicit DO and DO NOT tables. If a trigger isn't on the map, default to NOT writing.
+- `$OBSIDIAN_VAULT/_meta/add-adr.md` — full procedure for an Architectural Decision (per-project numbering, supersede flow, four-section structure, link-back into project MOC).
+- `$OBSIDIAN_VAULT/_meta/add-knowledge.md` — full procedure for a reusable knowledge note (`status: draft` always on first write, `confidence` scale, cross-project vs project-specific test — most learnings belong in `projects/sql-generator/notes/`, not in shared `knowledge/`).
+- `$OBSIDIAN_VAULT/AGENTS.md` — canonical rules: append-only files, supersede-not-delete, protected `<!-- STABLE -->` / `<!-- HUMAN -->` blocks, no cosmetic edits, log every operation to `_meta/log.md`.
+- `$OBSIDIAN_VAULT/_meta/conventions.md` + `_meta/taxonomy.md` — formatting rules and permitted tags (never invent tags).
+
+**Two universal protections** (apply on every write):
+
+1. If your edit would touch a `<!-- STABLE -->` or `<!-- HUMAN -->` block — **stop**, add a `## Pending review` section to that file with a one-liner, hand off to human.
+2. Every content-changing wiki write ends with one line in `_meta/log.md`. No exceptions.
+
+Default to **no wiki write** when ambiguous — the daily-summary worker captures session activity passively. A missed note is recoverable; a noisy wiki is not.
+
+### Auto-logging (no action required)
+
+Claude Code хуки и OpenCode plugin в этом репо (`.claude/settings.local.json`, `.opencode/plugins/obsidian-logger.js` — оба gitignored) сами пишут sessions/daily-logs в вальт. Делать ничего не нужно.
+
 ## Build and Run
 
 ```bash
@@ -92,7 +128,10 @@ LlmParser/         # LLM parser module
 
 ## Key Implementation Details
 
-- Type mapping defined in `SqlParser.MapPostgresToCSharpType()` (Parser.cs:209)
+- Type mapping defined in `SqlParser.MapPostgresToCSharpType()` (Parser.cs). Supports `timestamp with time zone → DateTimeOffset`, `time → TimeSpan`, `uuid → Guid`, `bytea → byte[]`, `json/jsonb → string`, `money → decimal`, `smallint/int2 → short`. Multi-word types склеиваются в `ParseSingleColumn` перед маппингом.
+- SQL line/block-комментарии (`-- ...`, `/* ... */`) удаляются `ParsePostgresCreateTableScript` перед регексом — комментарии внутри `CREATE TABLE` не ломают парсинг колонок.
+- `VirtualForeignKeyResolver` идемпотентен: если входная схема уже содержит `VirtualForeignKeys` (заполненные LLM/agent), резолвер только дополняет недостающие записи, дубликаты не создаёт.
+- MCP `SaveSchema` запускает `LlmResponseValidator` на JSON; критические ошибки → `success: false`, warnings → поле `warnings[]` в результате.
 - String case conversions in `StringExtensions` class (Generator.cs:13-87)
 - System columns (excluded from `editable_columns`): id, created_at, updated_at, created_by, updated_by (Generator.cs:266)
 - FK parsing handles both inline `REFERENCES` in columns and separate `ALTER TABLE ADD CONSTRAINT` statements

@@ -1,0 +1,150 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "tenant_id" && col.name != "is_active" && col.name != "is_deleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+
+  has_is_active = false
+  has_audit = false
+  for col in columns
+    if col.name == "is_active"; has_is_active = true; end
+    if col.name == "created_at"; has_audit = true; end
+  end
+~}}
+using Template_v1.Application.DTOs.Common;
+
+namespace Template_v1.Application.DTOs;
+
+// ═══════════════════════════════════════════════════════════
+// Detail DTO (для GET by ID)
+// ═══════════════════════════════════════════════════════════
+
+public class {{ entity_name }}DetailDto
+{
+{{~ if primary_key ~}}
+    public {{ primary_key.csharp_type }} {{ primary_key.name | to_pascal_case }} { get; set; }
+{{~ end ~}}
+{{~ for col in dto_columns ~}}
+{{~   if col.is_nullable && col.csharp_type != "string" ~}}
+    public {{ col.csharp_type }}? {{ col.name | to_pascal_case }} { get; set; }
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+    public string? {{ col.name | to_pascal_case }} { get; set; }
+{{~   else if col.csharp_type == "string" ~}}
+    public string {{ col.name | to_pascal_case }} { get; set; } = string.Empty;
+{{~   else ~}}
+    public {{ col.csharp_type }} {{ col.name | to_pascal_case }} { get; set; }
+{{~   end ~}}
+{{~   if col.is_foreign_key ~}}
+    public string? {{ col.name | remove_id_suffix | to_pascal_case }}DisplayName { get; set; }
+{{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+    public string? {{ vfk.column_name | remove_id_suffix | to_pascal_case }}DisplayName { get; set; }
+{{~ end ~}}
+{{~ if has_is_active ~}}
+    public bool IsActive { get; set; }
+{{~ end ~}}
+{{~ if has_audit ~}}
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+{{~ end ~}}
+}
+
+// ═══════════════════════════════════════════════════════════
+// List DTO (для GET list)
+// ═══════════════════════════════════════════════════════════
+
+public class {{ entity_name }}ListDto
+{
+{{~ if primary_key ~}}
+    public {{ primary_key.csharp_type }} {{ primary_key.name | to_pascal_case }} { get; set; }
+{{~ end ~}}
+{{~ for col in dto_columns ~}}
+{{~   if col.is_nullable && col.csharp_type != "string" ~}}
+    public {{ col.csharp_type }}? {{ col.name | to_pascal_case }} { get; set; }
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+    public string? {{ col.name | to_pascal_case }} { get; set; }
+{{~   else if col.csharp_type == "string" ~}}
+    public string {{ col.name | to_pascal_case }} { get; set; } = string.Empty;
+{{~   else ~}}
+    public {{ col.csharp_type }} {{ col.name | to_pascal_case }} { get; set; }
+{{~   end ~}}
+{{~   if col.is_foreign_key ~}}
+    public string? {{ col.name | remove_id_suffix | to_pascal_case }}DisplayName { get; set; }
+{{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+    public string? {{ vfk.column_name | remove_id_suffix | to_pascal_case }}DisplayName { get; set; }
+{{~ end ~}}
+{{~ if has_is_active ~}}
+    public bool IsActive { get; set; }
+{{~ end ~}}
+}
+
+// ═══════════════════════════════════════════════════════════
+// Filter (для GET list query params)
+// ═══════════════════════════════════════════════════════════
+
+public class {{ entity_name }}ListFilter : PagedRequest
+{
+    public string? Search { get; set; }
+{{~ if has_is_active ~}}
+    public bool? IsActive { get; set; }
+{{~ end ~}}
+{{~ for fk in foreign_keys ~}}
+    public {{ fk.csharp_type }}? {{ fk.column_name | to_pascal_case }} { get; set; }
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+    public {{ vfk.csharp_type }}? {{ vfk.column_name | to_pascal_case }} { get; set; }
+{{~ end ~}}
+}
+
+// ═══════════════════════════════════════════════════════════
+// Lookup DTO (для dropdowns)
+// ═══════════════════════════════════════════════════════════
+
+public class {{ entity_name }}LookupDto
+{
+    public int Id { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Create DTO
+// ═══════════════════════════════════════════════════════════
+
+public class Create{{ entity_name }}Dto
+{
+{{~ for col in dto_columns ~}}
+{{~   if col.is_nullable && col.csharp_type != "string" ~}}
+    public {{ col.csharp_type }}? {{ col.name | to_pascal_case }} { get; set; }
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+    public string? {{ col.name | to_pascal_case }} { get; set; }
+{{~   else if col.csharp_type == "string" ~}}
+    public string {{ col.name | to_pascal_case }} { get; set; } = string.Empty;
+{{~   else ~}}
+    public {{ col.csharp_type }} {{ col.name | to_pascal_case }} { get; set; }
+{{~   end ~}}
+{{~ end ~}}
+}
+
+// ═══════════════════════════════════════════════════════════
+// Update DTO
+// ═══════════════════════════════════════════════════════════
+
+public class Update{{ entity_name }}Dto
+{
+{{~ for col in dto_columns ~}}
+{{~   if col.is_nullable && col.csharp_type != "string" ~}}
+    public {{ col.csharp_type }}? {{ col.name | to_pascal_case }} { get; set; }
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+    public string? {{ col.name | to_pascal_case }} { get; set; }
+{{~   else if col.csharp_type == "string" ~}}
+    public string {{ col.name | to_pascal_case }} { get; set; } = string.Empty;
+{{~   else ~}}
+    public {{ col.csharp_type }} {{ col.name | to_pascal_case }} { get; set; }
+{{~   end ~}}
+{{~ end ~}}
+}

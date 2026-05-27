@@ -262,17 +262,24 @@ Agent:
 
 Система автоматически преобразует типы данных PostgreSQL в соответствующие типы C#:
 
-| Тип PostgreSQL                                                | Тип C#     |
-|---------------------------------------------------------------|------------|
-| `integer`, `serial`                                             | `int`      |
-| `bigint`, `bigserial`                                           | `long`     |
-| `text`, `varchar`, `character varying`                         | `string`   |
-| `boolean`                                                     | `bool`     |
-| `timestamp`, `timestamp without time zone`, `date`            | `DateTime` |
-| `real`                                                        | `float`    |
-| `double precision`                                            | `double`   |
-| `numeric`, `decimal`                                            | `decimal`  |
-| **другие типы**                                               | `object`   |
+| Тип PostgreSQL                                                | Тип C#            |
+|---------------------------------------------------------------|-------------------|
+| `integer`, `int`, `int4`, `serial`                             | `int`             |
+| `bigint`, `int8`, `bigserial`                                  | `long`            |
+| `smallint`, `int2`, `smallserial`                              | `short`           |
+| `text`, `varchar`, `character varying`, `char`, `character`    | `string`          |
+| `boolean`, `bool`                                              | `bool`            |
+| `timestamp`, `timestamp without time zone`                     | `DateTime`        |
+| `timestamp with time zone`, `timestamptz`                      | `DateTimeOffset`  |
+| `date`                                                         | `DateTime`        |
+| `time`, `time without time zone`                               | `TimeSpan`        |
+| `real`, `float4`                                               | `float`           |
+| `double precision`, `float8`                                   | `double`          |
+| `numeric`, `decimal`, `money`                                  | `decimal`         |
+| `uuid`                                                         | `Guid`            |
+| `bytea`                                                        | `byte[]`          |
+| `json`, `jsonb`                                                | `string`          |
+| **другие типы**                                                | `object`          |
 
 ## 🔍 Примеры использования
 

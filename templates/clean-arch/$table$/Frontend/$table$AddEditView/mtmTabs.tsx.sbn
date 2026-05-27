@@ -41,7 +41,7 @@
 ~}}
 {{~ if has_children || has_virtual_children ~}}
 import { useState } from 'react';
-import { Box, Tab, Tabs } from '@mui/material';
+import { Box, Tab, Tabs } from '@ui-kit';
 import { useTranslation } from 'react-i18next';
 {{~ for child in child_tables ~}}
 import {{ child.entity_name }}ListView from '@features/{{ child.entity_name }}/{{ child.entity_name }}ListView';

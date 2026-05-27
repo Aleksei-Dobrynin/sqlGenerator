@@ -1,0 +1,86 @@
+{{~
+  dto_columns = []
+  for col in editable_columns
+    if col.name != "tenant_id" && col.name != "is_active" && col.name != "is_deleted"
+      dto_columns = dto_columns | array.add col
+    end
+  end
+~}}
+using Template_v1.Application.DTOs;
+using FluentValidation;
+
+namespace Template_v1.Application.Validators;
+
+// TODO: Добавить Must(ValueObject.IsValid) если поле вынесено в VO (Email, PhoneNumber, Inn и т.д.)
+
+public class Create{{ entity_name }}Validator : AbstractValidator<Create{{ entity_name }}Dto>
+{
+    public Create{{ entity_name }}Validator()
+    {
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "string" && !col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name | to_pascal_case }})
+            .NotEmpty().WithMessage("Поле {{ col.name | to_pascal_case }} обязательно")
+            .MaximumLength(255).WithMessage("{{ col.name | to_pascal_case }} не должно превышать 255 символов");
+
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name | to_pascal_case }})
+            .MaximumLength(255).WithMessage("{{ col.name | to_pascal_case }} не должно превышать 255 символов")
+            .When(x => !string.IsNullOrWhiteSpace(x.{{ col.name | to_pascal_case }}));
+
+{{~   else if col.is_foreign_key && !col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name | to_pascal_case }})
+            .GreaterThan(0).WithMessage("Выберите значение для {{ col.name | to_pascal_case }}");
+
+{{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+{{~   vfk_pascal = vfk.column_name | to_pascal_case
+      vfk_nullable = true
+      for col in dto_columns
+        if (col.name | to_pascal_case) == vfk_pascal; vfk_nullable = col.is_nullable; break; end
+      end ~}}
+{{~   if !vfk_nullable ~}}
+        RuleFor(x => x.{{ vfk_pascal }})
+            .GreaterThan(0).WithMessage("Выберите значение для {{ vfk_pascal }}");
+
+{{~   end ~}}
+{{~ end ~}}
+    }
+}
+
+public class Update{{ entity_name }}Validator : AbstractValidator<Update{{ entity_name }}Dto>
+{
+    public Update{{ entity_name }}Validator()
+    {
+{{~ for col in dto_columns ~}}
+{{~   if col.csharp_type == "string" && !col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name | to_pascal_case }})
+            .NotEmpty().WithMessage("Поле {{ col.name | to_pascal_case }} обязательно")
+            .MaximumLength(255).WithMessage("{{ col.name | to_pascal_case }} не должно превышать 255 символов");
+
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name | to_pascal_case }})
+            .MaximumLength(255).WithMessage("{{ col.name | to_pascal_case }} не должно превышать 255 символов")
+            .When(x => !string.IsNullOrWhiteSpace(x.{{ col.name | to_pascal_case }}));
+
+{{~   else if col.is_foreign_key && !col.is_nullable ~}}
+        RuleFor(x => x.{{ col.name | to_pascal_case }})
+            .GreaterThan(0).WithMessage("Выберите значение для {{ col.name | to_pascal_case }}");
+
+{{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+{{~   vfk_pascal = vfk.column_name | to_pascal_case
+      vfk_nullable = true
+      for col in dto_columns
+        if (col.name | to_pascal_case) == vfk_pascal; vfk_nullable = col.is_nullable; break; end
+      end ~}}
+{{~   if !vfk_nullable ~}}
+        RuleFor(x => x.{{ vfk_pascal }})
+            .GreaterThan(0).WithMessage("Выберите значение для {{ vfk_pascal }}");
+
+{{~   end ~}}
+{{~ end ~}}
+    }
+}

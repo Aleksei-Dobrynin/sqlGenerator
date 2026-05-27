@@ -108,25 +108,35 @@ Return a JSON array of table schemas:
 
 ## Example
 
+Note: the example below demonstrates SaaS-style entities with the system fields that templates expect:
+`tenant_id` (multi-tenancy), `is_active`/`is_deleted` (soft-delete flags), and audit columns
+`created_at`/`updated_at`/`created_by`/`updated_by`. Always preserve these fields and their nullability/type
+exactly as in the SQL — templates rely on them for generating audit, soft-delete, and tenant-isolation logic.
+`TIMESTAMPTZ`/`TIMESTAMP WITH TIME ZONE` must map to `DateTimeOffset` (not `DateTime`).
+
 Input SQL:
 ```sql
-CREATE TABLE users (
+CREATE TABLE user_accounts (
     id SERIAL PRIMARY KEY,
+    tenant_id INTEGER NOT NULL,
     email VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE orders (
+CREATE TABLE departments (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    total NUMERIC(10,2)
-);
-
-CREATE TABLE reviews (
-    id SERIAL PRIMARY KEY,
-    order_id INTEGER NOT NULL,
-    reviewer_id INTEGER,
-    rating INTEGER NOT NULL
+    tenant_id INTEGER NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    parent_id INTEGER REFERENCES departments(id),
+    head_user_account_id INTEGER,  -- virtual FK: matches user_accounts by naming convention
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    is_deleted BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by INTEGER,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by INTEGER
 );
 ```
 
@@ -134,42 +144,40 @@ Output JSON:
 ```json
 [
   {
-    ""TableName"": ""users"",
-    ""EntityName"": ""Users"",
+    ""TableName"": ""user_accounts"",
+    ""EntityName"": ""UserAccounts"",
     ""Columns"": [
       {""Name"": ""id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": true, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""tenant_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
       {""Name"": ""email"", ""CSharpType"": ""string"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
-      {""Name"": ""created_at"", ""CSharpType"": ""DateTime"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": true}
+      {""Name"": ""is_active"", ""CSharpType"": ""bool"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""created_at"", ""CSharpType"": ""DateTimeOffset"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""updated_at"", ""CSharpType"": ""DateTimeOffset"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false}
     ],
     ""ForeignKeys"": [],
     ""VirtualForeignKeys"": []
   },
   {
-    ""TableName"": ""orders"",
-    ""EntityName"": ""Orders"",
+    ""TableName"": ""departments"",
+    ""EntityName"": ""Departments"",
     ""Columns"": [
       {""Name"": ""id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": true, ""IsForeignKey"": false, ""IsNullable"": false},
-      {""Name"": ""user_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": true, ""IsNullable"": false},
-      {""Name"": ""total"", ""CSharpType"": ""decimal"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": true}
+      {""Name"": ""tenant_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""name"", ""CSharpType"": ""string"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""parent_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": true, ""IsNullable"": true},
+      {""Name"": ""head_user_account_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": true},
+      {""Name"": ""is_active"", ""CSharpType"": ""bool"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""is_deleted"", ""CSharpType"": ""bool"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""created_at"", ""CSharpType"": ""DateTimeOffset"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""created_by"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": true},
+      {""Name"": ""updated_at"", ""CSharpType"": ""DateTimeOffset"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
+      {""Name"": ""updated_by"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": true}
     ],
     ""ForeignKeys"": [
-      {""ColumnName"": ""user_id"", ""CSharpType"": ""int"", ""ReferencesTable"": ""users"", ""ReferencesColumn"": ""id"", ""ConstraintName"": null}
+      {""ColumnName"": ""parent_id"", ""CSharpType"": ""int"", ""ReferencesTable"": ""departments"", ""ReferencesColumn"": ""id"", ""ConstraintName"": null}
     ],
-    ""VirtualForeignKeys"": []
-  },
-  {
-    ""TableName"": ""reviews"",
-    ""EntityName"": ""Reviews"",
-    ""Columns"": [
-      {""Name"": ""id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": true, ""IsForeignKey"": false, ""IsNullable"": false},
-      {""Name"": ""order_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false},
-      {""Name"": ""reviewer_id"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": true},
-      {""Name"": ""rating"", ""CSharpType"": ""int"", ""IsPrimaryKey"": false, ""IsForeignKey"": false, ""IsNullable"": false}
-    ],
-    ""ForeignKeys"": [],
     ""VirtualForeignKeys"": [
-      {""ColumnName"": ""order_id"", ""CSharpType"": ""int"", ""ReferencesTable"": ""orders"", ""ReferencesColumn"": ""id"", ""ConstraintName"": null},
-      {""ColumnName"": ""reviewer_id"", ""CSharpType"": ""int"", ""ReferencesTable"": ""users"", ""ReferencesColumn"": ""id"", ""ConstraintName"": null}
+      {""ColumnName"": ""head_user_account_id"", ""CSharpType"": ""int"", ""ReferencesTable"": ""user_accounts"", ""ReferencesColumn"": ""id"", ""ConstraintName"": null}
     ]
   }
 ]

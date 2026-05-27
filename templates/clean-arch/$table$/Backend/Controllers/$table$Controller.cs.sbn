@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Template_v1.API.Controllers;
 
 [Route("api/{{ route_name }}s")]
+[RequireModule("TODO_module_code")] // TODO: Укажите код модуля
 public class {{ entity_name }}Controller : BaseController
 {
     private readonly I{{ entity_name }}Service _service;
@@ -45,7 +46,12 @@ public class {{ entity_name }}Controller : BaseController
     [RequirePermission("{{ route_name }}.delete")]
     public async Task<IActionResult> Delete(int id)
     {
-        await _service.Delete(id, TenantId);
+        await _service.Delete(id, TenantId, UserId);
         return NoContent();
     }
+
+    [HttpGet("lookup")]
+    [RequirePermission("{{ route_name }}.read")]
+    public async Task<IActionResult> Lookup([FromQuery] string? search)
+        => Ok(await _service.Lookup(search, TenantId));
 }

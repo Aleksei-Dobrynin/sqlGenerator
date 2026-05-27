@@ -40,7 +40,8 @@ bld/
 # claude code directory
 .claude/
 
-CLAUDE.md
+# Serena MCP local state (project-specific cache)
+.serena/
 
 
 # Visual Studio 2017 auto generated files
@@ -404,4 +405,14 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# OpenCode local config and plugins (machine-specific, must stay personal)
+.opencode/
+
+# Generator output directories (not checked in)
+result/
+test_output/
+scaffold_check/
+verify_regex/
+verify_llm/
 

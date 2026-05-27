@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react';
 import { useParams, useNavigate } from 'react-router';
-import { Box, Button, Paper, Typography } from '@mui/material';
+import { Box, MuiButton, Paper, Typography } from '@ui-kit';
 import { useTranslation } from 'react-i18next';
 import { create{{ entity_name }}FormStore } from './store';
 import {{ entity_name }}AddEditBase from './base';
@@ -32,17 +32,17 @@ const {{ entity_name }}AddEditView = observer(function {{ entity_name }}AddEditV
         <{{ entity_name }}AddEditBase store={store} />
       </Paper>
       <Box sx={{ '{{' }} display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 {{ '}}' }}>
-        <Button onClick={() => navigate(-1)} data-cy="{{ entity_camel }}-page-cancel-btn">
+        <MuiButton onClick={() => navigate(-1)} data-cy="{{ entity_camel }}-page-cancel-btn">
           {t('common:cancel')}
-        </Button>
-        <Button
+        </MuiButton>
+        <MuiButton
           variant="contained"
           onClick={() => store.onSaveClick(() => navigate('/user/{{ route_name }}s'))}
           disabled={store.isSaving}
           data-cy="{{ entity_camel }}-page-save-btn"
         >
           {t('common:save')}
-        </Button>
+        </MuiButton>
       </Box>
       {store.id && <{{ entity_name }}MtmTabs {{ entity_camel }}Id={store.id} />}
     </Box>

@@ -1,0 +1,12 @@
+{{~
+  route_name = entity_name | to_snake_case
+~}}
+import http from '@api/https';
+import type { I{{ entity_name }}LookupDto } from '@constants/DataModels/{{ entity_name }}/{{ entity_name }}Types';
+
+export const get{{ entity_name }}Lookup = async (search?: string): Promise<I{{ entity_name }}LookupDto[]> => {
+  const response = await http.http.get<I{{ entity_name }}LookupDto[]>('/api/{{ route_name }}s/lookup', {
+    params: { search },
+  });
+  return response.data;
+};

@@ -1,7 +1,7 @@
 {{~
   dto_columns = []
   for col in editable_columns
-    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+    if col.name != "tenant_id" && col.name != "is_active" && col.name != "is_deleted"
       dto_columns = dto_columns | array.add col
     end
   end
@@ -9,8 +9,8 @@
   has_is_active = false
   has_audit = false
   for col in columns
-    if col.name == "IsActive"; has_is_active = true; end
-    if col.name == "CreatedAt"; has_audit = true; end
+    if col.name == "is_active"; has_is_active = true; end
+    if col.name == "created_at"; has_audit = true; end
   end
 
   entity_camel = entity_name | to_camel_case
@@ -30,6 +30,9 @@ export interface I{{ entity_name }}ListDto {
 {{~   else if col.csharp_type == "DateTime" ~}}
   {{ col.name | to_camel_case }}: string{{ if col.is_nullable }} | null{{ end }};
 {{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+  {{ vfk.column_name | remove_id_suffix | to_camel_case }}DisplayName: string | null;
 {{~ end ~}}
 {{~ if has_is_active ~}}
   isActive: boolean;
@@ -67,4 +70,9 @@ export interface I{{ entity_name }}SaveDto {
   {{ col.name | to_camel_case }}: string | null;
 {{~   end ~}}
 {{~ end ~}}
+}
+
+export interface I{{ entity_name }}LookupDto {
+  id: number;
+  displayName: string;
 }

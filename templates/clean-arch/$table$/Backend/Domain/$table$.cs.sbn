@@ -2,7 +2,7 @@
   # Detect audit fields
   has_audit = false
   for col in columns
-    if col.name == "CreatedAt" || col.name == "UpdatedAt" || col.name == "CreatedBy" || col.name == "UpdatedBy"
+    if col.name == "created_at" || col.name == "updated_at" || col.name == "created_by" || col.name == "updated_by"
       has_audit = true
       break
     end
@@ -11,17 +11,26 @@
   # Detect is_active
   has_is_active = false
   for col in columns
-    if col.name == "IsActive"
+    if col.name == "is_active"
       has_is_active = true
       break
     end
   end
 
-  # Detect is_deleted
+  # Detect is_deleted (soft-delete)
   has_is_deleted = false
   for col in columns
-    if col.name == "IsDeleted"
+    if col.name == "is_deleted"
       has_is_deleted = true
+      break
+    end
+  end
+
+  # Detect tenant
+  has_tenant = false
+  for col in columns
+    if col.name == "tenant_id"
+      has_tenant = true
       break
     end
   end
@@ -29,37 +38,52 @@
   # Filter columns for Create/Update params (exclude system + tenant + flags)
   dto_columns = []
   for col in editable_columns
-    if col.name != "TenantId" && col.name != "IsActive" && col.name != "IsDeleted"
+    if col.name != "tenant_id" && col.name != "is_active" && col.name != "is_deleted"
       dto_columns = dto_columns | array.add col
     end
   end
+
+  # Build interfaces list
+  interfaces = []
+  if has_audit; interfaces = interfaces | array.add "IAuditableEntity"; end
+  if has_tenant; interfaces = interfaces | array.add "ITenantDependant"; end
+  if has_is_deleted; interfaces = interfaces | array.add "ISoftDeletable"; end
 ~}}
 using Template_v1.Domain.Exceptions;
-{{~ if has_audit ~}}
 using Template_v1.Domain.Interfaces;
-{{~ end ~}}
 
 namespace Template_v1.Domain.Entities;
 
-// TODO: Добавьте Value Objects для полей, требующих валидации (Email, Phone и т.д.)
-// TODO: Добавьте Business Rules (см. Domain/BusinessRules/)
+// TODO: Проверить — нужно ли вынести строковые свойства в Value Objects (Email, PhoneNumber, Inn и т.д.)
+// TODO: Добавьте Business Rules при необходимости (см. Domain/BusinessRules/)
 
-{{~ if has_audit ~}}
-public class {{ entity_name }} : IAuditableEntity
+{{~ if interfaces | array.size > 0 ~}}
+public class {{ entity_name }} : {{ interfaces | array.join ", " }}
 {{~ else ~}}
 public class {{ entity_name }}
 {{~ end ~}}
 {
 {{~ for col in columns ~}}
+{{~   if col.name == "is_deleted" || col.name == "deleted_at" || col.name == "deleted_by"
+        # ISoftDeletable properties rendered separately below
+        continue
+      end ~}}
 {{~   if col.is_nullable && !col.is_primary_key && col.csharp_type != "string" ~}}
-    public {{ col.csharp_type }}? {{ col.name }} { get; private set; }
+    public {{ col.csharp_type }}? {{ col.name | to_pascal_case }} { get; private set; }
 {{~   else if col.csharp_type == "string" && col.is_nullable ~}}
-    public string? {{ col.name }} { get; private set; }
+    public string? {{ col.name | to_pascal_case }} { get; private set; }
 {{~   else if col.csharp_type == "string" ~}}
-    public string {{ col.name }} { get; private set; } = string.Empty;
+    public string {{ col.name | to_pascal_case }} { get; private set; } = string.Empty;
 {{~   else ~}}
-    public {{ col.csharp_type }} {{ col.name }} { get; private set; }
+    public {{ col.csharp_type }} {{ col.name | to_pascal_case }} { get; private set; }
 {{~   end ~}}
+{{~ end ~}}
+{{~ if has_is_deleted ~}}
+
+    // ISoftDeletable
+    public bool IsDeleted { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
+    public int? DeletedBy { get; private set; }
 {{~ end ~}}
 
     private {{ entity_name }}() { }
@@ -71,18 +95,18 @@ public class {{ entity_name }}
     public static {{ entity_name }} Create(
         int tenantId,
 {{~ for col in dto_columns ~}}
-        {{ col.csharp_type }}{{~ if col.is_nullable && col.csharp_type != "string" ~}}?{{~ end ~}} {{ col.name | to_camel_case }}{{~ if !for.last ~}},{{~ end ~}}
-{{~ end ~}},
+        {{ col.csharp_type }}{{ if col.is_nullable }}?{{ end }} {{ col.name | to_camel_case }},
+{{~ end ~}}
         int? createdBy = null)
     {
         var entity = new {{ entity_name }}
         {
 {{~ if primary_key ~}}
-            {{ primary_key.name }} = 0,
+            {{ primary_key.name | to_pascal_case }} = 0,
 {{~ end ~}}
             TenantId = tenantId,
 {{~ for col in dto_columns ~}}
-            {{ col.name }} = {{ col.name | to_camel_case }},
+            {{ col.name | to_pascal_case }} = {{ col.name | to_camel_case }},
 {{~ end ~}}
 {{~ if has_is_active ~}}
             IsActive = true,
@@ -91,8 +115,8 @@ public class {{ entity_name }}
             IsDeleted = false,
 {{~ end ~}}
 {{~ if has_audit ~}}
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow, // TODO: Заменить на IDateTimeProvider.UtcNow
+            UpdatedAt = DateTimeOffset.UtcNow,
             CreatedBy = createdBy
 {{~ end ~}}
         };
@@ -103,13 +127,23 @@ public class {{ entity_name }}
 
     internal static {{ entity_name }} Reconstitute(
 {{~ for col in columns ~}}
-        {{ col.csharp_type }}{{~ if col.is_nullable && col.csharp_type != "string" ~}}?{{~ end ~}} {{ col.name | to_camel_case }}{{~ if !for.last ~}},{{~ end ~}}
+{{~   if col.name == "deleted_at" ~}}
+        DateTimeOffset? {{ col.name | to_camel_case }}{{ if !for.last }},{{ end }}
+{{~   else if col.is_nullable && col.csharp_type != "string" ~}}
+        {{ col.csharp_type }}? {{ col.name | to_camel_case }}{{ if !for.last }},{{ end }}
+{{~   else if col.csharp_type == "string" && col.is_nullable ~}}
+        string? {{ col.name | to_camel_case }}{{ if !for.last }},{{ end }}
+{{~   else if col.csharp_type == "string" ~}}
+        string {{ col.name | to_camel_case }}{{ if !for.last }},{{ end }}
+{{~   else ~}}
+        {{ col.csharp_type }} {{ col.name | to_camel_case }}{{ if !for.last }},{{ end }}
+{{~   end ~}}
 {{~ end ~}})
     {
         return new {{ entity_name }}
         {
 {{~ for col in columns ~}}
-            {{ col.name }} = {{ col.name | to_camel_case }}{{~ if !for.last ~}},{{~ end ~}}
+            {{ col.name | to_pascal_case }} = {{ col.name | to_camel_case }}{{ if !for.last }},{{ end }}
 {{~ end ~}}
         };
     }
@@ -120,27 +154,49 @@ public class {{ entity_name }}
 
     public void Update(
 {{~ for col in dto_columns ~}}
-        {{ col.csharp_type }}{{~ if col.is_nullable && col.csharp_type != "string" ~}}?{{~ end ~}} {{ col.name | to_camel_case }},
+        {{ col.csharp_type }}{{ if col.is_nullable }}?{{ end }} {{ col.name | to_camel_case }},
 {{~ end ~}}
         int? updatedBy)
     {
 {{~ for col in dto_columns ~}}
-        {{ col.name }} = {{ col.name | to_camel_case }};
+        {{ col.name | to_pascal_case }} = {{ col.name | to_camel_case }};
 {{~ end ~}}
 {{~ if has_audit ~}}
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow; // TODO: Заменить на IDateTimeProvider.UtcNow
         UpdatedBy = updatedBy;
 {{~ end ~}}
 
         ValidateInvariants();
     }
 
+{{~ if has_is_deleted ~}}
+    public void Delete(int userId)
+    {
+        IsDeleted = true;
+        DeletedAt = DateTimeOffset.UtcNow; // TODO: Заменить на IDateTimeProvider.UtcNow
+        DeletedBy = userId;
+{{~ if has_audit ~}}
+        UpdatedAt = DateTimeOffset.UtcNow;
+        UpdatedBy = userId;
+{{~ end ~}}
+    }
+
+{{~ end ~}}
 {{~ if has_is_active ~}}
+    public void Activate(int? updatedBy = null)
+    {
+        IsActive = true;
+{{~ if has_audit ~}}
+        UpdatedAt = DateTimeOffset.UtcNow; // TODO: Заменить на IDateTimeProvider.UtcNow
+        UpdatedBy = updatedBy;
+{{~ end ~}}
+    }
+
     public void Deactivate(int? updatedBy = null)
     {
         IsActive = false;
 {{~ if has_audit ~}}
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow; // TODO: Заменить на IDateTimeProvider.UtcNow
         UpdatedBy = updatedBy;
 {{~ end ~}}
     }
@@ -153,13 +209,21 @@ public class {{ entity_name }}
     public void ValidateInvariants()
     {
         // TODO: Добавьте проверку инвариантов (синхронные правила без внешних зависимостей)
-        // Пример:
-        // if (string.IsNullOrWhiteSpace(Name))
-        //     throw new DomainException("Название обязательно");
 {{~ for col in dto_columns ~}}
 {{~   if !col.is_nullable && col.is_foreign_key ~}}
-        if ({{ col.name }} <= 0)
-            throw new DomainException("Некорректный {{ col.name }}");
+        if ({{ col.name | to_pascal_case }} <= 0)
+            throw new DomainException("Некорректный {{ col.name | to_pascal_case }}");
+{{~   end ~}}
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+{{~   vfk_pascal = vfk.column_name | to_pascal_case
+      vfk_nullable = true
+      for col in dto_columns
+        if col.name == vfk_pascal; vfk_nullable = col.is_nullable; break; end
+      end ~}}
+{{~   if !vfk_nullable ~}}
+        if ({{ vfk_pascal }} <= 0)
+            throw new DomainException("Некорректный {{ vfk_pascal }}");
 {{~   end ~}}
 {{~ end ~}}
     }
