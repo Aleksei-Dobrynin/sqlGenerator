@@ -1,21 +1,48 @@
-﻿import { makeAutoObservable, runInAction } from "mobx";
+{{~
+  # ─── Детект родительского (mtm) FK: C.table_name начинается с P.table_name + "_" ───
+  parent_fk_col = ""
+  parent_rel = ""
+  for fk in foreign_keys
+    if (table_name | string.starts_with (fk.references_table + "_"))
+      parent_fk_col = fk.column_name
+      parent_rel = fk.column_name | remove_id_suffix | to_pascal_case
+    end
+  end
+  if parent_fk_col == ""
+    for vfk in virtual_foreign_keys
+      if (table_name | string.starts_with (vfk.references_table + "_"))
+        parent_fk_col = vfk.column_name
+        parent_rel = vfk.column_name | remove_id_suffix | to_pascal_case
+      end
+    end
+  end
+  is_child = parent_fk_col != ""
+~}}
+import { makeAutoObservable, runInAction } from "mobx";
 import i18n from "i18next";
 import MainStore from "MainStore";
-import { get{{ entity_name }}s, get{{ entity_name }}sPagination } from "api/{{ entity_name }}/useGet{{ entity_name }}s";
-import { delete{{ entity_name }} } from "api/{{ entity_name }}/useDelete{{ entity_name }}";
+{{~ if is_child ~}}
+import { get{{ entity_name }}sBy{{ parent_rel }} } from "api/{{ entity_name }}";
+import { delete{{ entity_name }} } from "api/{{ entity_name }}";
+{{~ else ~}}
+import { get{{ entity_name }}sPagination } from "api/{{ entity_name }}";
+import { delete{{ entity_name }} } from "api/{{ entity_name }}";
 import { GridSortModel } from "@mui/x-data-grid";
+{{~ end ~}}
 
 class NewStore {
   data = [];
   openPanel = false;
   currentId = 0;
-  idMain: number | null = null;
+  idMain = 0;
+{{~ if !is_child ~}}
 
   pageSize = 10;
   pageNumber = 0;
   orderType = null;
   orderBy = null;
   totalCount = 0;
+{{~ end ~}}
 
   constructor() {
     makeAutoObservable(this);
@@ -26,7 +53,8 @@ class NewStore {
       this.idMain = id;
     });
   }
-  
+{{~ if !is_child ~}}
+
   changePagination = (page: number, pageSize: number) => {
     runInAction(() => {
       this.pageNumber = page;
@@ -34,7 +62,7 @@ class NewStore {
     });
     this.load{{ entity_name }}s();
   };
-  
+
   changeSort = (sortModel: GridSortModel) => {
     runInAction(() => {
       if (sortModel.length === 0) {
@@ -47,6 +75,7 @@ class NewStore {
     });
     this.load{{ entity_name }}s();
   };
+{{~ end ~}}
 
   onEditClicked(id: number) {
     runInAction(() => {
@@ -65,15 +94,26 @@ class NewStore {
   load{{ entity_name }}s = async () => {
     try {
       MainStore.changeLoader(true);
-      const response = await get{{ entity_name }}sPagination(this.pageSize, this.pageNumber, this.orderBy, this.orderType{{~ for fk in foreign_keys ~}}{{~ if fk.column_name == (table_name | to_snake_case) + "_id" ~}}, this.idMain{{~ end ~}}{{~ end ~}}{{~ for vfk in virtual_foreign_keys ~}}{{~ if vfk.column_name == (table_name | to_snake_case) + "_id" ~}}, this.idMain{{~ end ~}}{{~ end ~}});
+{{~ if is_child ~}}
+      const response = await get{{ entity_name }}sBy{{ parent_rel }}(this.idMain);
+      if ((response.status === 201 || response.status === 200) && response?.data !== null) {
+        runInAction(() => {
+          this.data = response.data;
+        });
+      } else {
+        throw new Error();
+      }
+{{~ else ~}}
+      const response = await get{{ entity_name }}sPagination(this.pageSize, this.pageNumber, this.orderBy, this.orderType);
       if ((response.status === 201 || response.status === 200) && response?.data !== null) {
         runInAction(() => {
           this.data = response.data.items;
           this.totalCount = response.data.totalCount;
-        })
+        });
       } else {
         throw new Error();
       }
+{{~ end ~}}
     } catch (err) {
       MainStore.setSnackbar(i18n.t("message:somethingWentWrong"), "error");
     } finally {
@@ -112,7 +152,7 @@ class NewStore {
       this.data = [];
       this.currentId = 0;
       this.openPanel = false;
-      this.idMain = null;
+      this.idMain = 0;
     });
   };
 }

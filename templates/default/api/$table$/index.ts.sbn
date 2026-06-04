@@ -1,0 +1,45 @@
+import http from "api/https";
+import { {{ entity_name }} } from "constants/{{ entity_name }}";
+
+export const get{{ entity_name }}s = (): Promise<any> => {
+  return http.get("/{{ entity_name }}/GetAll");
+};
+
+export const get{{ entity_name }}sPagination = (
+  pageSize: number,
+  pageNumber: number,
+  orderBy: string | null,
+  orderType: string | null
+): Promise<any> => {
+  return http.get(
+    "/{{ entity_name }}/GetPaginated?pageSize=" + pageSize + "&pageNumber=" + (pageNumber + 1)
+  );
+};
+
+export const get{{ entity_name }} = (id: number): Promise<any> => {
+  return http.get("/{{ entity_name }}/GetOneById?id=" + id);
+};
+
+export const create{{ entity_name }} = (data: {{ entity_name }}): Promise<any> => {
+  return http.post("/{{ entity_name }}/Create", data);
+};
+
+export const update{{ entity_name }} = (data: {{ entity_name }}): Promise<any> => {
+  return http.put("/{{ entity_name }}/Update", data);
+};
+
+export const delete{{ entity_name }} = (id: number): Promise<any> => {
+  return http.remove("/{{ entity_name }}/Delete?id=" + id, {});
+};
+{{~ for fk in foreign_keys ~}}
+
+export const get{{ entity_name }}sBy{{ fk.column_name | remove_id_suffix | to_pascal_case }} = ({{ fk.column_name }}: number): Promise<any> => {
+  return http.get("/{{ entity_name }}/GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}?{{ fk.column_name }}=" + {{ fk.column_name }});
+};
+{{~ end ~}}
+{{~ for vfk in virtual_foreign_keys ~}}
+
+export const get{{ entity_name }}sBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }} = ({{ vfk.column_name }}: number): Promise<any> => {
+  return http.get("/{{ entity_name }}/GetBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }}?{{ vfk.column_name }}=" + {{ vfk.column_name }});
+};
+{{~ end ~}}

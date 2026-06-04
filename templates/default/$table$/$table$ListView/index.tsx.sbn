@@ -1,20 +1,40 @@
-﻿import { FC, useEffect } from 'react';
-import {
-  Checkbox,
-  Container
-} from "@mui/material";
-import PageGrid from 'components/PageGrid';
-import { observer } from "mobx-react"
-import store from "./store"
+{{~
+  # ─── Детект родительского (mtm) FK ───
+  parent_fk_col = ""
+  for fk in foreign_keys
+    if (table_name | string.starts_with (fk.references_table + "_"))
+      parent_fk_col = fk.column_name
+    end
+  end
+  if parent_fk_col == ""
+    for vfk in virtual_foreign_keys
+      if (table_name | string.starts_with (vfk.references_table + "_"))
+        parent_fk_col = vfk.column_name
+      end
+    end
+  end
+  is_child = parent_fk_col != ""
+~}}
+import { FC, useEffect } from 'react';
+import { Checkbox, Container } from "@mui/material";
+import { observer } from "mobx-react";
+import store from "./store";
 import { useTranslation } from 'react-i18next';
 import { GridColDef } from '@mui/x-data-grid';
+import dayjs from 'dayjs';
+{{~ if is_child ~}}
 import PopupGrid from 'components/PopupGrid';
 import {{ entity_name }}PopupForm from './../{{ entity_name }}AddEditView/popupForm';
+{{~ else ~}}
 import PageGridPagination from "components/PageGridPagination";
-import dayjs from 'dayjs';
+{{~ end ~}}
 
 type {{ entity_name }}ListViewProps = {
+{{~ if is_child ~}}
+  idMain: number;
+{{~ else ~}}
   idMain?: number;
+{{~ end ~}}
 };
 
 const {{ entity_name }}ListView: FC<{{ entity_name }}ListViewProps> = observer((props) => {
@@ -22,18 +42,26 @@ const {{ entity_name }}ListView: FC<{{ entity_name }}ListViewProps> = observer((
   const translate = t;
 
   useEffect(() => {
-    if (props.idMain) {
+{{~ if is_child ~}}
+    if (store.idMain !== props.idMain) {
       store.setIdMain(props.idMain);
     }
-    store.load{{ entity_name }}s()
+    store.load{{ entity_name }}s();
     return () => {
-      store.clearStore()
-    }
-  }, [props.idMain])
+      store.clearStore();
+    };
+  }, [props.idMain]);
+{{~ else ~}}
+    store.load{{ entity_name }}s();
+    return () => {
+      store.clearStore();
+    };
+  }, []);
+{{~ end ~}}
 
   const columns: GridColDef[] = [
 {{~ for column in columns ~}}
-{{~ if !column.is_system ~}}
+{{~ if !column.is_system && column.name != parent_fk_col ~}}
 {{~ if column.csharp_type == "bool" ~}}
     {
       field: '{{ column.name }}',
@@ -69,11 +97,28 @@ const {{ entity_name }}ListView: FC<{{ entity_name }}ListViewProps> = observer((
 {{~ end ~}}
   ];
 
-  let type1: string = 'form';
-  let component = null;
-  switch (type1) {
-    case 'form':
-      component = <PageGridPagination
+  return (
+    <Container maxWidth='xl' style={ { marginTop: 30 } }>
+{{~ if is_child ~}}
+      <PopupGrid
+        title={translate("label:{{ entity_name }}ListView.entityTitle")}
+        onDeleteClicked={(id: number) => store.delete{{ entity_name }}(id)}
+        onEditClicked={(id: number) => store.onEditClicked(id)}
+        columns={columns}
+        data={store.data}
+        tableName="{{ entity_name }}" />
+
+      <{{ entity_name }}PopupForm
+        openPanel={store.openPanel}
+        id={store.currentId}
+        onBtnCancelClick={() => store.closePanel()}
+        onSaveClick={() => {
+          store.closePanel();
+          store.load{{ entity_name }}s();
+        }}
+      />
+{{~ else ~}}
+      <PageGridPagination
         title={translate("label:{{ entity_name }}ListView.entityTitle")}
         onDeleteClicked={(id: number) => store.delete{{ entity_name }}(id)}
         columns={columns}
@@ -85,32 +130,7 @@ const {{ entity_name }}ListView: FC<{{ entity_name }}ListViewProps> = observer((
         totalCount={store.totalCount}
         data={store.data}
         tableName="{{ entity_name }}" />
-      break
-    case 'popup':
-      component = <PopupGrid
-        title={translate("label:{{ entity_name }}ListView.entityTitle")}
-        onDeleteClicked={(id: number) => store.delete{{ entity_name }}(id)}
-        onEditClicked={(id: number) => store.onEditClicked(id)}
-        columns={columns}
-        data={store.data}
-        tableName="{{ entity_name }}" />
-      break
-  }
-
-  return (
-    <Container maxWidth='xl' style={\\{ marginTop: 30 \\}}>
-      {component}
-
-      <{{ entity_name }}PopupForm
-        openPanel={store.openPanel}
-        id={store.currentId}
-        onBtnCancelClick={() => store.closePanel()}
-        onSaveClick={() => {
-          store.closePanel()
-          store.load{{ entity_name }}s()
-        }}
-      />
-
+{{~ end ~}}
     </Container>
   );
 })
