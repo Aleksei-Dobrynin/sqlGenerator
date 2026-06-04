@@ -1,0 +1,11 @@
+export type {{ entity_name }} = {
+{{~ for column in columns ~}}
+{{~ if column.csharp_type == "bool" ~}}
+  {{ column.name }}: boolean;
+{{~ else if column.csharp_type == "int" || column.csharp_type == "long" || column.csharp_type == "short" || column.csharp_type == "decimal" || column.csharp_type == "double" || column.csharp_type == "float" ~}}
+  {{ column.name }}: number;
+{{~ else ~}}
+  {{ column.name }}: string;
+{{~ end ~}}
+{{~ end ~}}
+};

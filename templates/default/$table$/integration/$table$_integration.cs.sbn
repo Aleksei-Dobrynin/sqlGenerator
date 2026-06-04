@@ -1,27 +1,37 @@
-﻿// IUnitOfWork
+// ═══════════════════════════════════════════════════════════════════════════
+// Ручная интеграция {{ entity_name }} в инфраструктуру.
+// Скопируйте фрагменты ниже в соответствующие файлы проекта.
+// ═══════════════════════════════════════════════════════════════════════════
 
-I{{ entity_name | to_camel_case }}Repository {{ entity_name | to_camel_case }}Repository { get; }}}
+// ─── Application/Repositories/Base/IUnitOfWork.cs ───
+// Добавьте свойство в интерфейс IUnitOfWork:
 
-// UnitOfWork
+I{{ entity_name }}Repository {{ entity_name }}Repository { get; }
 
-private readonly I{{ entity_name | to_camel_case }}Repository _{{ entity_name | to_camel_case }}Repository;
 
-// ...
+// ─── Infrastructure/Data/UnitOfWork.cs ───
+// Добавьте приватное поле:
 
-public I{{ entity_name | to_camel_case }}Repository _{{ entity_name | to_pascal_case }}Repository
+private I{{ entity_name }}Repository? _{{ entity_name | to_camel_case }}Repository;
+
+// ...и ленивое свойство:
+
+public I{{ entity_name }}Repository {{ entity_name }}Repository
 {
     get
     {
-        if (_{{ entity_name | to_pascal_case }}Repository == null)
+        if (_{{ entity_name | to_camel_case }}Repository == null)
         {
-            _{{ entity_name | to_pascal_case }}Repository = new {{ entity_name | to_camel_case }}Repository(_dbConnection, _appEnvironment, _userRepository);
-            _{{ entity_name | to_pascal_case }}Repository.SetTransaction(_dbTransaction);
+            _{{ entity_name | to_camel_case }}Repository = new {{ entity_name }}Repository(_dbConnection, _userRepository);
+            _{{ entity_name | to_camel_case }}Repository.SetTransaction(_dbTransaction);
         }
-        return _{{ entity_name | to_pascal_case }}Repository;
+        return _{{ entity_name | to_camel_case }}Repository;
     }
 }
 
-// Program
 
-builder.Services.AddScoped<I{{ entity_name | to_camel_case }}Repository, {{ entity_name | to_camel_case }}Repository>();
-builder.Services.AddScoped<{{ entity_name | to_camel_case }}UseCases>();
+// ─── WebApi/Program.cs ───
+// Зарегистрируйте репозиторий и use-case в DI:
+
+builder.Services.AddScoped<I{{ entity_name }}Repository, {{ entity_name }}Repository>();
+builder.Services.AddScoped<{{ entity_name }}UseCases>();

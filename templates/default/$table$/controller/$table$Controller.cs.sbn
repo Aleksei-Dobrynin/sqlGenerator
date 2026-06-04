@@ -30,6 +30,28 @@ namespace WebApi.Controllers
             var response = await _{{ entity_name | to_camel_case }}UseCases.GetOneByID(id);
             return Ok(response);
         }
+{{~ for fk in foreign_keys ~}}
+
+        [HttpGet]
+        [Route("GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}")]
+        public async Task<IActionResult> GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}({{ fk.csharp_type }} {{ fk.column_name }})
+        {
+            var response = await _{{ entity_name | to_camel_case }}UseCases.GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}({{ fk.column_name }});
+            return Ok(response);
+        }
+{{~ end ~}}
+
+        // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+
+        [HttpGet]
+        [Route("GetBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }}")]
+        public async Task<IActionResult> GetBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }}({{ vfk.csharp_type }} {{ vfk.column_name }})
+        {
+            var response = await _{{ entity_name | to_camel_case }}UseCases.GetBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }}({{ vfk.column_name }});
+            return Ok(response);
+        }
+{{~ end ~}}
 
         [HttpGet]
         [Route("GetPaginated")]

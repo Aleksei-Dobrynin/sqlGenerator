@@ -155,7 +155,7 @@ namespace Infrastructure.Repositories
         }
 {{~ for fk in foreign_keys ~}}
 
-        public async Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | to_pascal_case | string.replace "_id" "" }}({{ fk.csharp_type }} {{ fk.column_name }})
+        public async Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}({{ fk.csharp_type }} {{ fk.column_name }})
         {
             try
             {
@@ -173,7 +173,7 @@ namespace Infrastructure.Repositories
         // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
 {{~ for vfk in virtual_foreign_keys ~}}
 
-        public async Task<List<{{ entity_name }}>> GetBy{{ vfk.column_name | to_pascal_case | string.replace "_id" "" }}({{ vfk.csharp_type }} {{ vfk.column_name }})
+        public async Task<List<{{ entity_name }}>> GetBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }}({{ vfk.csharp_type }} {{ vfk.column_name }})
         {
             try
             {

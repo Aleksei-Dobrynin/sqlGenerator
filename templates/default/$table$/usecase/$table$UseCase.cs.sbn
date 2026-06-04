@@ -22,6 +22,22 @@ namespace Application.UseCases
         {
             return unitOfWork.{{ entity_name }}Repository.GetOneByID(id);
         }
+{{~ for fk in foreign_keys ~}}
+
+        public Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}({{ fk.csharp_type }} {{ fk.column_name }})
+        {
+            return unitOfWork.{{ entity_name }}Repository.GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}({{ fk.column_name }});
+        }
+{{~ end ~}}
+
+        // ═══ Virtual Foreign Keys (inferred from naming conventions) ═══
+{{~ for vfk in virtual_foreign_keys ~}}
+
+        public Task<List<{{ entity_name }}>> GetBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }}({{ vfk.csharp_type }} {{ vfk.column_name }})
+        {
+            return unitOfWork.{{ entity_name }}Repository.GetBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }}({{ vfk.column_name }});
+        }
+{{~ end ~}}
 
         public async Task<{{ entity_name }}> Create({{ entity_name }} domain)
         {

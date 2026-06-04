@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { observer } from "mobx-react";
 import store from "./store";
 import CustomButton from "components/Button";
+import MtmTabs from "./mtmTabs";
 
 type {{ entity_name }}Props = {};
 
@@ -36,6 +37,12 @@ const {{ entity_name }}AddEditView: FC<{{ entity_name }}Props> = observer((props
   return (
     <{{ entity_name }}AddEditBaseView {...props}>
 
+      {store.id > 0 && (
+        <Grid item xs={12}>
+          <MtmTabs />
+        </Grid>
+      )}
+
       <Grid item xs={12} spacing={0}>
         <Box display="flex" p={2}>
           <Box m={2}>
@@ -55,7 +62,7 @@ const {{ entity_name }}AddEditView: FC<{{ entity_name }}Props> = observer((props
             <CustomButton
               variant="contained"
               color={"secondary"}
-              sx={\\{color:"white", backgroundColor: "red !important"\\}}
+              sx={ { color: "white", backgroundColor: "red !important" } }
               id="id_{{ entity_name }}CancelButton"
               onClick={() => navigate("/user/{{ entity_name }}")}
             >

@@ -1,53 +1,10 @@
-﻿import { FC, useEffect } from "react";
+import { FC, useEffect } from "react";
 import {{ entity_name }}AddEditBaseView from "./base";
 import store from "./store";
 import { observer } from "mobx-react";
-import { Dialog, DialogActions, DialogContent, DialogTitle, Grid } from "@mui/material";
+import { Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import CustomButton from "components/Button";
-{{~
-  # Find child tables that reference this table
-  child_tables = []
-  for other_table in all_tables
-    for fk in other_table.foreign_keys
-      if fk.references_table == table_name
-        child_tables = child_tables | array.add other_table
-      end
-    end
-  end
-
-  # Virtual Foreign Keys: find child tables via inferred relationships
-  virtual_child_tables = []
-  for other_table in virtual_all_tables
-    for fk in other_table.foreign_keys
-      if fk.references_table == table_name
-        # Avoid duplicates with real child_tables
-        already_added = false
-        for ct in child_tables
-          if ct.table_name == other_table.table_name
-            already_added = true
-            break
-          end
-        end
-        if !already_added
-          virtual_child_tables = virtual_child_tables | array.add other_table
-        end
-      end
-    end
-  end
-~}}
-{{~ if child_tables.size > 0 ~}}
-// Import child table fast input forms
-{{~ for child in child_tables ~}}
-import FastInput{{ child.entity_name }}View from "features/{{ child.table_name | to_snake_case }}/{{ child.entity_name }}AddEditView/fastInput";
-{{~ end ~}}
-{{~ end ~}}
-{{~ if virtual_child_tables.size > 0 ~}}
-/* ═══ Virtual Foreign Keys: child table imports (inferred from naming conventions) ═══ */
-{{~ for child in virtual_child_tables ~}}
-import FastInput{{ child.entity_name }}View from "features/{{ child.table_name | to_snake_case }}/{{ child.entity_name }}AddEditView/fastInput";
-{{~ end ~}}
-{{~ end ~}}
 
 type PopupFormProps = {
   openPanel: boolean;
@@ -56,7 +13,7 @@ type PopupFormProps = {
   onSaveClick: (id: number) => void;
 }
 
-const PopupForm: FC<PopupFormProps> = observer((props) => {
+const {{ entity_name }}PopupForm: FC<PopupFormProps> = observer((props) => {
   const { t } = useTranslation();
   const translate = t;
 
@@ -69,36 +26,10 @@ const PopupForm: FC<PopupFormProps> = observer((props) => {
   }, [props.openPanel]);
 
   return (
-    <Dialog open={props.openPanel} onClose={props.onBtnCancelClick} fullWidth={true} maxWidth="lg">
+    <Dialog open={props.openPanel} onClose={props.onBtnCancelClick} fullWidth={true} maxWidth="sm">
       <DialogTitle>{translate("label:{{ entity_name }}AddEditView.entityTitle")}</DialogTitle>
       <DialogContent>
-
-        <Grid container>
-          <Grid md={{{~ if child_tables.size > 0 || virtual_child_tables.size > 0 ~}}6{{~ else ~}}12{{~ end ~}}} xs={12} item>
-            <{{ entity_name }}AddEditBaseView
-              isPopup={true}
-            >
-            </{{ entity_name }}AddEditBaseView>
-          </Grid>
-{{~ if child_tables.size > 0 || virtual_child_tables.size > 0 ~}}
-          <Grid md={6} xs={12} item>
-            {store.id !== 0 && (
-              <>
-{{~ for child in child_tables ~}}
-                <FastInput{{ child.entity_name }}View idMain={store.id} />
-{{~ end ~}}
-{{~ if virtual_child_tables.size > 0 ~}}
-                {/* ═══ Virtual Foreign Keys: child forms (inferred from naming conventions) ═══ */}
-{{~ for child in virtual_child_tables ~}}
-                <FastInput{{ child.entity_name }}View idMain={store.id} />
-{{~ end ~}}
-{{~ end ~}}
-              </>
-            )}
-          </Grid>
-{{~ end ~}}
-        </Grid>
-
+        <{{ entity_name }}AddEditBaseView isPopup={true} />
       </DialogContent>
       <DialogActions>
         <CustomButton
@@ -122,4 +53,4 @@ const PopupForm: FC<PopupFormProps> = observer((props) => {
   );
 });
 
-export default PopupForm;
+export default {{ entity_name }}PopupForm;
