@@ -135,6 +135,8 @@ LlmParser/         # LLM parser module
 - String case conversions in `StringExtensions` class (Generator.cs:13-87)
 - System columns (excluded from `editable_columns`): id, created_at, updated_at, created_by, updated_by (Generator.cs:266)
 - FK parsing handles both inline `REFERENCES` in columns and separate `ALTER TABLE ADD CONSTRAINT` statements
+- PK parsing handles inline (`id int PRIMARY KEY`), table-level (`PRIMARY KEY (a, b)`, compound) and `ALTER TABLE ... ADD ... PRIMARY KEY (cols)`. Table-level constraint lines (`PRIMARY KEY`/`UNIQUE`/`FOREIGN KEY`/`CHECK`/`EXCLUDE`/`CONSTRAINT`) распознаются в `ParseColumns` и не превращаются в колонки.
+- Quoted-идентификаторы и schema-qualified имена (`"User"`, `public."User"`) парсятся и нормализуются (`StripQuotes`) для таблиц, REFERENCES и ALTER-конструкций.
 
 ## MCP Server (`SqlGenerator.Mcp/`)
 
@@ -189,6 +191,13 @@ Agent:
   4. → save_schema(schemaFilePath, "schema.json")
   5. → generate_files("schema.json", outputDir, templatesDir)
 ```
+
+**Full-module scaffolding into a project — batch-transplant (preferred):** generate a whole batch via
+MCP, then transplant into the project using the compiler/toolchain as an error oracle (5 phases:
+generate → bulk transplant → diagnostics → batch-fix → verify). The agent drives the utility as an MCP
+server and parses the schema itself (not the built-in parsers). Source of truth:
+[`runbooks/batch-transplant-workflow.md`](runbooks/batch-transplant-workflow.md); phase 3–5 details in
+[`docs/batch/`](docs/batch/).
 
 ### Schema JSON Format
 
