@@ -222,9 +222,9 @@ public class SqlGeneratorTools
 
             var templatesPath = ResolveTemplatesPathVersioned(
                 templatesDir, presetName, templatesRef, fromProject, out var worktree, out string? resolveError);
+            using var _wt = worktree;
             if (resolveError != null)
                 return Fail(resolveError);
-            using var _wt = worktree;
 
             var json = File.ReadAllText(schemaPath);
             var tables = JsonSerializer.Deserialize<List<TableSchema>>(json, JsonOptions);
@@ -291,9 +291,9 @@ public class SqlGeneratorTools
 
             var templatesPath = ResolveTemplatesPathVersioned(
                 templatesDir, presetName, templatesRef, fromProject, out var worktree, out string? resolveError);
+            using var _wt = worktree;
             if (resolveError != null)
                 return Fail(resolveError);
-            using var _wt = worktree;
 
             var tables = SqlParser.ParsePostgresCreateTableScript(sql);
 
