@@ -403,6 +403,12 @@ public class SqlGeneratorTools
             return templatesDir;
         }
 
+        if (!PresetTag.IsValid(@ref))
+        {
+            error = $"Invalid version ref '{@ref}': expected '<preset>-v<major>.<minor>' (e.g. 'default-v1.0').";
+            return templatesDir;
+        }
+
         try
         {
             var repoRoot = TemplateRefResolver.FindRepoRoot(Directory.GetCurrentDirectory());

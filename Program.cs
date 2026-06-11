@@ -253,6 +253,10 @@ namespace SqlToEntityGenerator
             if (@ref == null)
                 return ResolveTemplatesDir(args, "templates"); // версионирование не запрошено — обычный путь
 
+            if (!PresetTag.IsValid(@ref))
+                throw new ArgumentException(
+                    $"Invalid version ref '{@ref}': expected '<preset>-v<major>.<minor>' (e.g. 'default-v1.0').");
+
             var repoRoot = TemplateRefResolver.FindRepoRoot(Directory.GetCurrentDirectory());
             worktree = TemplateRefResolver.Materialize(repoRoot, preset!, @ref);
             Console.WriteLine($"Materialized templates at ref '{@ref}': {worktree.TemplatesDir}");
