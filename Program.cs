@@ -37,65 +37,65 @@ namespace SqlToEntityGenerator
                 var configPath = GetArgValue(args, "--config") ?? "appsettings.json";
                 var sqlScriptPath = GetArgValue(args, "--sql") ?? "sql/script.sql";
 
-                string templatesDir = ResolveVersionedTemplatesDir(args, ResolveTemplatesDir(args, "templates"), out TemplateWorktree? versionedWorktree);
-
-                string resultDir = GetArgValue(args, "--output") ?? GetResultDirFromArgs(args) ?? GetResultDirInteractive();
-
-                Console.WriteLine("=== SQL File Generator ===");
-                Console.WriteLine($"Parser mode: {(useLlm ? "LLM" : "Regex")}");
-                Console.WriteLine($"SQL script: {sqlScriptPath}");
-                Console.WriteLine($"Templates: {templatesDir}");
-                Console.WriteLine($"Output: {resultDir}");
-                Console.WriteLine($"Virtual FKs: {(includeVirtualFks ? "Enabled" : "Disabled")}");
-                Console.WriteLine();
-
-                if (!File.Exists(sqlScriptPath))
-                {
-                    Console.WriteLine($"SQL script file not found at {sqlScriptPath}");
-                    return;
-                }
-
-                string sqlScript = File.ReadAllText(sqlScriptPath);
-
-                List<TableSchema> tables;
-
-                if (useLlm)
-                {
-                    Console.WriteLine("Loading LLM configuration...");
-                    var config = LoadLlmConfiguration(configPath);
-
-                    Console.WriteLine("Starting LLM parser...");
-                    using var llmParser = new LlmParserService(config);
-                    tables = await llmParser.ParseSqlAsync(sqlScript);
-                }
-                else
-                {
-                    Console.WriteLine("Using regex parser...");
-                    tables = SqlParser.ParsePostgresCreateTableScript(sqlScript);
-                }
-
-                if (tables == null || tables.Count == 0)
-                {
-                    Console.WriteLine("No tables were parsed from the SQL script.");
-                    return;
-                }
-
-                Console.WriteLine($"Parsed {tables.Count} table(s) from the SQL script.");
-
-                if (includeVirtualFks)
-                {
-                    VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
-                    Console.WriteLine($"Inferred {tables.Sum(t => t.VirtualForeignKeys.Count)} virtual foreign key(s).");
-                }
-
-                if (!Directory.Exists(templatesDir))
-                {
-                    Console.WriteLine($"Templates directory not found at {templatesDir}");
-                    return;
-                }
+                string templatesDir = ResolveVersionedTemplatesDir(args, out TemplateWorktree? versionedWorktree);
 
                 try
                 {
+                    string resultDir = GetArgValue(args, "--output") ?? GetResultDirFromArgs(args) ?? GetResultDirInteractive();
+
+                    Console.WriteLine("=== SQL File Generator ===");
+                    Console.WriteLine($"Parser mode: {(useLlm ? "LLM" : "Regex")}");
+                    Console.WriteLine($"SQL script: {sqlScriptPath}");
+                    Console.WriteLine($"Templates: {templatesDir}");
+                    Console.WriteLine($"Output: {resultDir}");
+                    Console.WriteLine($"Virtual FKs: {(includeVirtualFks ? "Enabled" : "Disabled")}");
+                    Console.WriteLine();
+
+                    if (!File.Exists(sqlScriptPath))
+                    {
+                        Console.WriteLine($"SQL script file not found at {sqlScriptPath}");
+                        return;
+                    }
+
+                    string sqlScript = File.ReadAllText(sqlScriptPath);
+
+                    List<TableSchema> tables;
+
+                    if (useLlm)
+                    {
+                        Console.WriteLine("Loading LLM configuration...");
+                        var config = LoadLlmConfiguration(configPath);
+
+                        Console.WriteLine("Starting LLM parser...");
+                        using var llmParser = new LlmParserService(config);
+                        tables = await llmParser.ParseSqlAsync(sqlScript);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Using regex parser...");
+                        tables = SqlParser.ParsePostgresCreateTableScript(sqlScript);
+                    }
+
+                    if (tables == null || tables.Count == 0)
+                    {
+                        Console.WriteLine("No tables were parsed from the SQL script.");
+                        return;
+                    }
+
+                    Console.WriteLine($"Parsed {tables.Count} table(s) from the SQL script.");
+
+                    if (includeVirtualFks)
+                    {
+                        VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
+                        Console.WriteLine($"Inferred {tables.Sum(t => t.VirtualForeignKeys.Count)} virtual foreign key(s).");
+                    }
+
+                    if (!Directory.Exists(templatesDir))
+                    {
+                        Console.WriteLine($"Templates directory not found at {templatesDir}");
+                        return;
+                    }
+
                     Directory.CreateDirectory(resultDir);
                     FileGenerator.GenerateOtherFiles(tables, templatesDir, resultDir, includeVirtualFks);
 
@@ -225,7 +225,7 @@ namespace SqlToEntityGenerator
         /// Возвращает templatesDir (внутри worktree) и worktree для последующего Dispose (или null).
         /// При отсутствии флагов возвращает обычный templatesDir и null.
         /// </summary>
-        private static string ResolveVersionedTemplatesDir(string[] args, string defaultTemplatesDir, out TemplateWorktree? worktree)
+        private static string ResolveVersionedTemplatesDir(string[] args, out TemplateWorktree? worktree)
         {
             worktree = null;
 
@@ -251,7 +251,7 @@ namespace SqlToEntityGenerator
             }
 
             if (@ref == null)
-                return defaultTemplatesDir; // версионирование не запрошено
+                return ResolveTemplatesDir(args, "templates"); // версионирование не запрошено — обычный путь
 
             var repoRoot = TemplateRefResolver.FindRepoRoot(Directory.GetCurrentDirectory());
             worktree = TemplateRefResolver.Materialize(repoRoot, preset!, @ref);
