@@ -1,0 +1,13 @@
+{
+  "preset": "default",
+  "generatorRef": "default-v1.0",
+  "generatorRepo": "https://github.com/Aleksei-Dobrynin/sqlGenerator.git",
+  "layerMap": {
+    "entity": "Domain",
+    "irepo": "Application",
+    "usecase": "Application",
+    "dto": "Application",
+    "repo": "Infrastructure",
+    "controller": "WebApi"
+  }
+}

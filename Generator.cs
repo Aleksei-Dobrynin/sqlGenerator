@@ -216,6 +216,10 @@ namespace SQLFileGenerator
                 // Относительный путь к файлу (чтобы сохранить структуру директорий)
                 var relativePath = templateFile.Substring(templatesDir.Length + 1);
 
+                // Маркер версии пресета (preset.json) — метаданные пресета, не шаблон: в вывод не переносим
+                if (Path.GetFileName(relativePath) == PresetInfo.FileName)
+                    continue;
+
                 // Получаем директорию шаблона
                 var directory = Path.GetDirectoryName(relativePath);
 
