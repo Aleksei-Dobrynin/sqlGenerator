@@ -25,6 +25,8 @@ namespace SqlToEntityGenerator
         ///   --output [path]   Путь для сохранения результатов
         ///   --sql [path]      Путь к SQL скрипту (по умолчанию sql/script.sql)
         ///   --no-virtual-fks  Отключить виртуальные FK (включены по умолчанию)
+        ///   --from-project [path] Догенерация по .sqlgen.json проекта (preset + версия пресета)
+        ///   --templates-ref [ref] Извлечь шаблоны пресета на git-ref (требует --preset)
         /// </param>
         static async Task Main(string[] args)
         {
@@ -35,7 +37,7 @@ namespace SqlToEntityGenerator
                 var configPath = GetArgValue(args, "--config") ?? "appsettings.json";
                 var sqlScriptPath = GetArgValue(args, "--sql") ?? "sql/script.sql";
 
-                string templatesDir = ResolveTemplatesDir(args, "templates");
+                string templatesDir = ResolveVersionedTemplatesDir(args, ResolveTemplatesDir(args, "templates"), out TemplateWorktree? versionedWorktree);
 
                 string resultDir = GetArgValue(args, "--output") ?? GetResultDirFromArgs(args) ?? GetResultDirInteractive();
 
@@ -92,11 +94,18 @@ namespace SqlToEntityGenerator
                     return;
                 }
 
-                Directory.CreateDirectory(resultDir);
-                FileGenerator.GenerateOtherFiles(tables, templatesDir, resultDir, includeVirtualFks);
+                try
+                {
+                    Directory.CreateDirectory(resultDir);
+                    FileGenerator.GenerateOtherFiles(tables, templatesDir, resultDir, includeVirtualFks);
 
-                Console.WriteLine();
-                Console.WriteLine($"Files successfully generated to: {resultDir}");
+                    Console.WriteLine();
+                    Console.WriteLine($"Files successfully generated to: {resultDir}");
+                }
+                finally
+                {
+                    versionedWorktree?.Dispose();
+                }
             }
             catch (Exception ex)
             {
@@ -139,7 +148,7 @@ namespace SqlToEntityGenerator
                 // Пропускаем флаги и их значения
                 if (arg.StartsWith("--"))
                 {
-                    if (arg == "--config" || arg == "--output" || arg == "--sql")
+                    if (arg == "--config" || arg == "--output" || arg == "--sql" || arg == "--preset" || arg == "--from-project" || arg == "--templates-ref")
                     {
                         i++; // Пропускаем значение
                     }
@@ -150,7 +159,7 @@ namespace SqlToEntityGenerator
                 if (i > 0)
                 {
                     var prevArg = args[i - 1];
-                    if (prevArg == "--config" || prevArg == "--output" || prevArg == "--sql")
+                    if (prevArg == "--config" || prevArg == "--output" || prevArg == "--sql" || prevArg == "--preset" || prevArg == "--from-project" || prevArg == "--templates-ref")
                     {
                         continue;
                     }
@@ -209,6 +218,45 @@ namespace SqlToEntityGenerator
                 return Path.Combine(templatesBaseDir, availablePresets[0]);
 
             return Path.Combine(templatesBaseDir, GetPresetInteractive(availablePresets));
+        }
+
+        /// <summary>
+        /// Если заданы --from-project или --templates-ref — материализует шаблоны пресета на git-ref.
+        /// Возвращает templatesDir (внутри worktree) и worktree для последующего Dispose (или null).
+        /// При отсутствии флагов возвращает обычный templatesDir и null.
+        /// </summary>
+        private static string ResolveVersionedTemplatesDir(string[] args, string defaultTemplatesDir, out TemplateWorktree? worktree)
+        {
+            worktree = null;
+
+            var fromProject = GetArgValue(args, "--from-project");
+            var templatesRef = GetArgValue(args, "--templates-ref");
+
+            string? preset = null;
+            string? @ref = null;
+
+            if (!string.IsNullOrEmpty(fromProject))
+            {
+                var cfg = SqlGenConfigLoader.Load(fromProject);
+                preset = cfg.Preset;
+                @ref = cfg.GeneratorRef;
+                Console.WriteLine($"From project: preset='{preset}', ref='{@ref}'");
+            }
+
+            if (!string.IsNullOrEmpty(templatesRef))
+            {
+                @ref = templatesRef;
+                preset ??= GetArgValue(args, "--preset")
+                    ?? throw new ArgumentException("--templates-ref requires --preset (or use --from-project).");
+            }
+
+            if (@ref == null)
+                return defaultTemplatesDir; // версионирование не запрошено
+
+            var repoRoot = TemplateRefResolver.FindRepoRoot(Directory.GetCurrentDirectory());
+            worktree = TemplateRefResolver.Materialize(repoRoot, preset!, @ref);
+            Console.WriteLine($"Materialized templates at ref '{@ref}': {worktree.TemplatesDir}");
+            return worktree.TemplatesDir;
         }
 
         /// <summary>
