@@ -24,7 +24,10 @@ public sealed class TemplateWorktree : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        GitRunner.Run(_repoDir, "worktree", "remove", "--force", _worktreePath);
+        var result = GitRunner.Run(_repoDir, "worktree", "remove", "--force", _worktreePath);
+        if (result.ExitCode != 0)
+            Console.Error.WriteLine(
+                $"[sqlgen] Warning: git worktree remove failed for '{_worktreePath}': {result.StdErr.Trim()}");
     }
 }
 

@@ -25,43 +25,70 @@ public class TemplateRefResolverTests
         return repo;
     }
 
+    private static void SafeDelete(string dir)
+    {
+        try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+        catch { /* best-effort temp cleanup */ }
+    }
+
     [Fact]
     public void Materialize_ExtractsPresetTreeAtRef_AndCleansUp()
     {
         var repo = InitGeneratorRepo();
-        // изменить пресет после тега — worktree должен отдать СТАРОЕ содержимое
-        File.WriteAllText(Path.Combine(repo, "templates", "default", "marker.txt"), "v2 content");
-
-        string worktreePath;
-        using (var wt = TemplateRefResolver.Materialize(repo, "default", "default-v1.0"))
+        try
         {
-            Assert.True(Directory.Exists(wt.TemplatesDir));
-            Assert.EndsWith(Path.Combine("templates", "default"), wt.TemplatesDir);
-            Assert.Equal("v1.0 content",
-                File.ReadAllText(Path.Combine(wt.TemplatesDir, "marker.txt")));
-            worktreePath = Path.GetDirectoryName(Path.GetDirectoryName(wt.TemplatesDir))!;
-            Assert.True(Directory.Exists(worktreePath));
+            // изменить пресет после тега — worktree должен отдать СТАРОЕ содержимое
+            File.WriteAllText(Path.Combine(repo, "templates", "default", "marker.txt"), "v2 content");
+
+            string worktreePath;
+            using (var wt = TemplateRefResolver.Materialize(repo, "default", "default-v1.0"))
+            {
+                Assert.True(Directory.Exists(wt.TemplatesDir));
+                Assert.EndsWith(Path.Combine("templates", "default"), wt.TemplatesDir);
+                Assert.Equal("v1.0 content",
+                    File.ReadAllText(Path.Combine(wt.TemplatesDir, "marker.txt")));
+                worktreePath = Path.GetDirectoryName(Path.GetDirectoryName(wt.TemplatesDir))!;
+                Assert.True(Directory.Exists(worktreePath));
+            }
+            // после Dispose worktree удалён
+            Assert.False(Directory.Exists(worktreePath));
         }
-        // после Dispose worktree удалён
-        Assert.False(Directory.Exists(worktreePath));
+        finally
+        {
+            SafeDelete(repo);
+        }
     }
 
     [Fact]
     public void Materialize_UnknownRef_Throws()
     {
         var repo = InitGeneratorRepo();
-        Assert.Throws<InvalidOperationException>(() =>
-            TemplateRefResolver.Materialize(repo, "default", "default-v9.9"));
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                TemplateRefResolver.Materialize(repo, "default", "default-v9.9"));
+        }
+        finally
+        {
+            SafeDelete(repo);
+        }
     }
 
     [Fact]
     public void FindRepoRoot_ReturnsToplevel()
     {
         var repo = InitGeneratorRepo();
-        var sub = Path.Combine(repo, "templates", "default");
-        var root = TemplateRefResolver.FindRepoRoot(sub);
-        Assert.Equal(
-            Path.GetFullPath(repo).TrimEnd(Path.DirectorySeparatorChar),
-            Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar));
+        try
+        {
+            var sub = Path.Combine(repo, "templates", "default");
+            var root = TemplateRefResolver.FindRepoRoot(sub);
+            Assert.Equal(
+                Path.GetFullPath(repo).TrimEnd(Path.DirectorySeparatorChar),
+                Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar));
+        }
+        finally
+        {
+            SafeDelete(repo);
+        }
     }
 }

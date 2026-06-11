@@ -24,10 +24,10 @@ public static class GitRunner
         using var p = Process.Start(psi)
             ?? throw new InvalidOperationException("Failed to start git process");
 
-        var stdout = p.StandardOutput.ReadToEnd();
-        var stderr = p.StandardError.ReadToEnd();
+        var stdoutTask = p.StandardOutput.ReadToEndAsync();
+        var stderrTask = p.StandardError.ReadToEndAsync();
         p.WaitForExit();
 
-        return new GitResult(p.ExitCode, stdout, stderr);
+        return new GitResult(p.ExitCode, stdoutTask.Result, stderrTask.Result);
     }
 }
