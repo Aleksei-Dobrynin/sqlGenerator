@@ -217,7 +217,7 @@ namespace SQLFileGenerator
                 var relativePath = templateFile.Substring(templatesDir.Length + 1);
 
                 // Маркер версии пресета (preset.json) — метаданные пресета, не шаблон: в вывод не переносим
-                if (Path.GetFileName(relativePath) == PresetInfo.FileName)
+                if (Path.GetFileName(relativePath).Equals(PresetInfo.FileName, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 // Получаем директорию шаблона
