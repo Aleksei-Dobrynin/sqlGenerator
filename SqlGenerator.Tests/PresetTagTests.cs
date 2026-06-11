@@ -13,6 +13,7 @@ public class PresetTagTests
     [InlineData("default-v1", false)]
     [InlineData("default-1.0", false)]
     [InlineData("Default-v1.0", false)]
+    [InlineData("default--v1.0", false)]
     public void IsValid_MatchesSchema(string tag, bool expected)
     {
         Assert.Equal(expected, PresetTag.IsValid(tag));
@@ -25,5 +26,14 @@ public class PresetTagTests
         Assert.Equal("clean-arch", preset);
         Assert.Equal(2, major);
         Assert.Equal(5, minor);
+    }
+
+    [Fact]
+    public void TryParse_InvalidTag_ReturnsFalse()
+    {
+        Assert.False(PresetTag.TryParse("default-v1", out var preset, out var major, out var minor));
+        Assert.Equal("", preset);
+        Assert.Equal(0, major);
+        Assert.Equal(0, minor);
     }
 }

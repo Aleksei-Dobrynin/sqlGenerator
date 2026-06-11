@@ -8,7 +8,7 @@ namespace SQLFileGenerator;
 public static class PresetTag
 {
     private static readonly Regex Pattern = new(
-        @"^(?<preset>[a-z0-9][a-z0-9-]*)-v(?<major>\d+)\.(?<minor>\d+)$",
+        @"^(?<preset>[a-z0-9][a-z0-9-]*[a-z0-9]|[a-z0-9])-v(?<major>\d+)\.(?<minor>\d+)$",
         RegexOptions.Compiled);
 
     public static bool IsValid(string tag) =>
