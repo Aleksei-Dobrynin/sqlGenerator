@@ -208,7 +208,11 @@ public class SqlGeneratorTools
         [Description("Template preset name (e.g. 'default'). If not specified and presets exist, returns error. Call 'list_presets' first.")]
         string presetName = "",
         [Description("Include virtual foreign keys inferred from naming conventions (e.g. user_id -> users.id). Default: true")]
-        bool includeVirtualFks = true)
+        bool includeVirtualFks = true,
+        [Description("Git ref of preset version to extract templates from (e.g. 'default-v1.0'). Requires presetName.")]
+        string templatesRef = "",
+        [Description("Path to consumer project dir with .sqlgen.json — resolves preset + version automatically.")]
+        string fromProject = "")
     {
         try
         {
@@ -216,9 +220,11 @@ public class SqlGeneratorTools
             if (!File.Exists(schemaPath))
                 return Fail($"Schema file not found: {schemaPath}");
 
-            var templatesPath = ResolveTemplatesPath(templatesDir, presetName, out string? resolveError);
+            var templatesPath = ResolveTemplatesPathVersioned(
+                templatesDir, presetName, templatesRef, fromProject, out var worktree, out string? resolveError);
             if (resolveError != null)
                 return Fail(resolveError);
+            using var _wt = worktree;
 
             var json = File.ReadAllText(schemaPath);
             var tables = JsonSerializer.Deserialize<List<TableSchema>>(json, JsonOptions);
@@ -267,7 +273,11 @@ public class SqlGeneratorTools
         [Description("Template preset name (e.g. 'default'). If not specified and presets exist, returns error. Call 'list_presets' first.")]
         string presetName = "",
         [Description("Include virtual foreign keys inferred from naming conventions (e.g. user_id -> users.id). Default: true")]
-        bool includeVirtualFks = true)
+        bool includeVirtualFks = true,
+        [Description("Git ref of preset version to extract templates from (e.g. 'default-v1.0'). Requires presetName.")]
+        string templatesRef = "",
+        [Description("Path to consumer project dir with .sqlgen.json — resolves preset + version automatically.")]
+        string fromProject = "")
     {
         try
         {
@@ -279,9 +289,11 @@ public class SqlGeneratorTools
             if (string.IsNullOrWhiteSpace(sql))
                 return Fail("SQL file is empty");
 
-            var templatesPath = ResolveTemplatesPath(templatesDir, presetName, out string? resolveError);
+            var templatesPath = ResolveTemplatesPathVersioned(
+                templatesDir, presetName, templatesRef, fromProject, out var worktree, out string? resolveError);
             if (resolveError != null)
                 return Fail(resolveError);
+            using var _wt = worktree;
 
             var tables = SqlParser.ParsePostgresCreateTableScript(sql);
 
@@ -354,6 +366,50 @@ public class SqlGeneratorTools
             ? $"Multiple presets found ({string.Join(", ", presets)}). Specify 'presetName' parameter. Call 'list_presets' to see available presets."
             : "No presets found in templates directory.";
         return templatesPath;
+    }
+
+    /// <summary>
+    /// Версионный резолв шаблонов для MCP. Если задан templatesRef или fromProject —
+    /// материализует worktree и возвращает его templatesDir + worktree для Dispose.
+    /// Иначе делегирует обычному ResolveTemplatesPath.
+    /// </summary>
+    private static string ResolveTemplatesPathVersioned(
+        string templatesDir, string presetName, string templatesRef, string fromProject,
+        out TemplateWorktree? worktree, out string? error)
+    {
+        worktree = null;
+        error = null;
+
+        string? preset = string.IsNullOrEmpty(presetName) ? null : presetName;
+        string? @ref = string.IsNullOrEmpty(templatesRef) ? null : templatesRef;
+
+        if (!string.IsNullOrEmpty(fromProject))
+        {
+            try
+            {
+                var cfg = SqlGenConfigLoader.Load(fromProject);
+                preset ??= cfg.Preset;
+                @ref ??= cfg.GeneratorRef;
+            }
+            catch (Exception ex) { error = ex.Message; return templatesDir; }
+        }
+
+        if (@ref == null)
+            return ResolveTemplatesPath(templatesDir, presetName, out error);
+
+        if (string.IsNullOrEmpty(preset))
+        {
+            error = "templatesRef requires presetName (or use fromProject with .sqlgen.json).";
+            return templatesDir;
+        }
+
+        try
+        {
+            var repoRoot = TemplateRefResolver.FindRepoRoot(Directory.GetCurrentDirectory());
+            worktree = TemplateRefResolver.Materialize(repoRoot, preset, @ref);
+            return worktree.TemplatesDir;
+        }
+        catch (Exception ex) { error = ex.Message; return templatesDir; }
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
