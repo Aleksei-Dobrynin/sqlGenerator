@@ -103,7 +103,7 @@ namespace Infrastructure.Repositories
                 };
                 await FillLogDataHelper.FillLogDataUpdate(model, userId);
 
-                var sql = @"UPDATE {{ table_name }} SET {{~ for column in columns ~}}{{~ if column.Name != "id" ~}}{{ column.Name }} = @{{ column.Name }}{{~ if !for.last ~}}, {{~ end ~}}{{~ end ~}}{{~ end ~}} WHERE id = @id";
+                var sql = @"UPDATE {{ table_name }} SET {{ for column in columns }}{{~ if column.Name != "id" ~}}{{ column.Name }} = @{{ column.Name }}{{~ if !for.last ~}}, {{ end ~}}{{~ end ~}}{{ end }} WHERE id = @id";
                 var affected = await _dbConnection.ExecuteAsync(sql, model, transaction: _dbTransaction);
                 if (affected == 0)
                 {

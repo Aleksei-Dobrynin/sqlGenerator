@@ -31,7 +31,7 @@
 
 **Возвращает:** `{ success, tableCount, tables[], schemaFile }`
 
-**Ограничения:** Regex-парсер. Корректно обрабатывает SQL-комментарии (`-- ...`, `/* ... */`) и multi-word типы (`timestamp with time zone`, `double precision`, `character varying`). Всё ещё ограничен в продвинутых DDL: партиционирование, INHERITS, exclusion constraints, expression-индексы. Для сложного SQL используйте workflow с парсингом агентом.
+**Ограничения:** Regex-парсер. Корректно обрабатывает SQL-комментарии (`-- ...`, `/* ... */`), multi-word типы (`timestamp with time zone`, `double precision`, `character varying`), quoted/schema-qualified идентификаторы (`"User"`, `public."User"`) и первичные ключи, объявленные inline, table-level (`PRIMARY KEY (...)`) или через `ALTER TABLE ... ADD ... PRIMARY KEY`. Всё ещё ограничен в продвинутых DDL: партиционирование, INHERITS, exclusion constraints, expression-индексы. Для сложного SQL используйте workflow с парсингом агентом.
 
 ### SaveSchema
 
@@ -117,6 +117,28 @@ Agent -> ParseSql(sqlFilePath) -> GenerateFiles(schemaFile, outputDir, presetNam
 4. Agent -> SaveSchema(schemaFilePath, outputPath)
 5. Agent -> GenerateFiles(schemaFile, outputDir, presetName)
 ```
+
+### Batch-transplant (предпочтительный режим для full-module scaffolding)
+
+Для генерации целого модуля / множества таблиц с встраиванием в реальный проект — это
+**рекомендуемый по умолчанию** режим. Агент работает с утилитой **как с MCP-сервером** и **парсит
+схему сам** (сценарий «агент парсит» выше), а не через встроенные парсеры: regex-парсер спотыкается
+на боевых pg_dump (quoted-идентификаторы, table-level / `ALTER` PRIMARY KEY), поэтому нетривиальный
+DDL разбирает агент.
+
+Пять фаз (компилятор/тулчейн как оракул ошибок):
+
+```
+[предусловие: инфра-базис заведён в проекте]
+1. Generate (batch)    агент парсит -> SaveSchema -> GenerateFiles в scratch (не в дерево проекта)
+2. Bulk transplant     одна скриптовая операция: папка_генератора -> слой проекта
+3. Diagnostics oracle  один прогон build + typecheck/build + lint -> ПОЛНЫЙ список ошибок
+4. Batch-fix           чинить классами, каскадные -> частные; rebuild до зелёного
+5. Verify              CRUD / runtime к живой базе
+```
+
+Полный пошаговый гайд (источник истины): [`runbooks/batch-transplant-workflow.md`](runbooks/batch-transplant-workflow.md).
+Детали фаз 3–5: [`docs/batch/`](docs/batch/).
 
 ## Формат JSON схемы
 

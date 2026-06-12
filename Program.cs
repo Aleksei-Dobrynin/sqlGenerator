@@ -25,6 +25,8 @@ namespace SqlToEntityGenerator
         ///   --output [path]   Путь для сохранения результатов
         ///   --sql [path]      Путь к SQL скрипту (по умолчанию sql/script.sql)
         ///   --no-virtual-fks  Отключить виртуальные FK (включены по умолчанию)
+        ///   --from-project [path] Догенерация по .sqlgen.json проекта (preset + версия пресета)
+        ///   --templates-ref [ref] Извлечь шаблоны пресета на git-ref (требует --preset)
         /// </param>
         static async Task Main(string[] args)
         {
@@ -35,68 +37,75 @@ namespace SqlToEntityGenerator
                 var configPath = GetArgValue(args, "--config") ?? "appsettings.json";
                 var sqlScriptPath = GetArgValue(args, "--sql") ?? "sql/script.sql";
 
-                string templatesDir = ResolveTemplatesDir(args, "templates");
+                string templatesDir = ResolveVersionedTemplatesDir(args, out TemplateWorktree? versionedWorktree);
 
-                string resultDir = GetArgValue(args, "--output") ?? GetResultDirFromArgs(args) ?? GetResultDirInteractive();
-
-                Console.WriteLine("=== SQL File Generator ===");
-                Console.WriteLine($"Parser mode: {(useLlm ? "LLM" : "Regex")}");
-                Console.WriteLine($"SQL script: {sqlScriptPath}");
-                Console.WriteLine($"Templates: {templatesDir}");
-                Console.WriteLine($"Output: {resultDir}");
-                Console.WriteLine($"Virtual FKs: {(includeVirtualFks ? "Enabled" : "Disabled")}");
-                Console.WriteLine();
-
-                if (!File.Exists(sqlScriptPath))
+                try
                 {
-                    Console.WriteLine($"SQL script file not found at {sqlScriptPath}");
-                    return;
+                    string resultDir = GetArgValue(args, "--output") ?? GetResultDirFromArgs(args) ?? GetResultDirInteractive();
+
+                    Console.WriteLine("=== SQL File Generator ===");
+                    Console.WriteLine($"Parser mode: {(useLlm ? "LLM" : "Regex")}");
+                    Console.WriteLine($"SQL script: {sqlScriptPath}");
+                    Console.WriteLine($"Templates: {templatesDir}");
+                    Console.WriteLine($"Output: {resultDir}");
+                    Console.WriteLine($"Virtual FKs: {(includeVirtualFks ? "Enabled" : "Disabled")}");
+                    Console.WriteLine();
+
+                    if (!File.Exists(sqlScriptPath))
+                    {
+                        Console.WriteLine($"SQL script file not found at {sqlScriptPath}");
+                        return;
+                    }
+
+                    string sqlScript = File.ReadAllText(sqlScriptPath);
+
+                    List<TableSchema> tables;
+
+                    if (useLlm)
+                    {
+                        Console.WriteLine("Loading LLM configuration...");
+                        var config = LoadLlmConfiguration(configPath);
+
+                        Console.WriteLine("Starting LLM parser...");
+                        using var llmParser = new LlmParserService(config);
+                        tables = await llmParser.ParseSqlAsync(sqlScript);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Using regex parser...");
+                        tables = SqlParser.ParsePostgresCreateTableScript(sqlScript);
+                    }
+
+                    if (tables == null || tables.Count == 0)
+                    {
+                        Console.WriteLine("No tables were parsed from the SQL script.");
+                        return;
+                    }
+
+                    Console.WriteLine($"Parsed {tables.Count} table(s) from the SQL script.");
+
+                    if (includeVirtualFks)
+                    {
+                        VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
+                        Console.WriteLine($"Inferred {tables.Sum(t => t.VirtualForeignKeys.Count)} virtual foreign key(s).");
+                    }
+
+                    if (!Directory.Exists(templatesDir))
+                    {
+                        Console.WriteLine($"Templates directory not found at {templatesDir}");
+                        return;
+                    }
+
+                    Directory.CreateDirectory(resultDir);
+                    FileGenerator.GenerateOtherFiles(tables, templatesDir, resultDir, includeVirtualFks);
+
+                    Console.WriteLine();
+                    Console.WriteLine($"Files successfully generated to: {resultDir}");
                 }
-
-                string sqlScript = File.ReadAllText(sqlScriptPath);
-
-                List<TableSchema> tables;
-
-                if (useLlm)
+                finally
                 {
-                    Console.WriteLine("Loading LLM configuration...");
-                    var config = LoadLlmConfiguration(configPath);
-
-                    Console.WriteLine("Starting LLM parser...");
-                    using var llmParser = new LlmParserService(config);
-                    tables = await llmParser.ParseSqlAsync(sqlScript);
+                    versionedWorktree?.Dispose();
                 }
-                else
-                {
-                    Console.WriteLine("Using regex parser...");
-                    tables = SqlParser.ParsePostgresCreateTableScript(sqlScript);
-                }
-
-                if (tables == null || tables.Count == 0)
-                {
-                    Console.WriteLine("No tables were parsed from the SQL script.");
-                    return;
-                }
-
-                Console.WriteLine($"Parsed {tables.Count} table(s) from the SQL script.");
-
-                if (includeVirtualFks)
-                {
-                    VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
-                    Console.WriteLine($"Inferred {tables.Sum(t => t.VirtualForeignKeys.Count)} virtual foreign key(s).");
-                }
-
-                if (!Directory.Exists(templatesDir))
-                {
-                    Console.WriteLine($"Templates directory not found at {templatesDir}");
-                    return;
-                }
-
-                Directory.CreateDirectory(resultDir);
-                FileGenerator.GenerateOtherFiles(tables, templatesDir, resultDir, includeVirtualFks);
-
-                Console.WriteLine();
-                Console.WriteLine($"Files successfully generated to: {resultDir}");
             }
             catch (Exception ex)
             {
@@ -139,7 +148,7 @@ namespace SqlToEntityGenerator
                 // Пропускаем флаги и их значения
                 if (arg.StartsWith("--"))
                 {
-                    if (arg == "--config" || arg == "--output" || arg == "--sql")
+                    if (arg == "--config" || arg == "--output" || arg == "--sql" || arg == "--preset" || arg == "--from-project" || arg == "--templates-ref")
                     {
                         i++; // Пропускаем значение
                     }
@@ -150,7 +159,7 @@ namespace SqlToEntityGenerator
                 if (i > 0)
                 {
                     var prevArg = args[i - 1];
-                    if (prevArg == "--config" || prevArg == "--output" || prevArg == "--sql")
+                    if (prevArg == "--config" || prevArg == "--output" || prevArg == "--sql" || prevArg == "--preset" || prevArg == "--from-project" || prevArg == "--templates-ref")
                     {
                         continue;
                     }
@@ -209,6 +218,49 @@ namespace SqlToEntityGenerator
                 return Path.Combine(templatesBaseDir, availablePresets[0]);
 
             return Path.Combine(templatesBaseDir, GetPresetInteractive(availablePresets));
+        }
+
+        /// <summary>
+        /// Если заданы --from-project или --templates-ref — материализует шаблоны пресета на git-ref.
+        /// Возвращает templatesDir (внутри worktree) и worktree для последующего Dispose (или null).
+        /// При отсутствии флагов возвращает обычный templatesDir и null.
+        /// </summary>
+        private static string ResolveVersionedTemplatesDir(string[] args, out TemplateWorktree? worktree)
+        {
+            worktree = null;
+
+            var fromProject = GetArgValue(args, "--from-project");
+            var templatesRef = GetArgValue(args, "--templates-ref");
+
+            string? preset = null;
+            string? @ref = null;
+
+            if (!string.IsNullOrEmpty(fromProject))
+            {
+                var cfg = SqlGenConfigLoader.Load(fromProject);
+                preset = cfg.Preset;
+                @ref = cfg.GeneratorRef;
+                Console.WriteLine($"From project: preset='{preset}', ref='{@ref}'");
+            }
+
+            if (!string.IsNullOrEmpty(templatesRef))
+            {
+                @ref = templatesRef;
+                preset ??= GetArgValue(args, "--preset")
+                    ?? throw new ArgumentException("--templates-ref requires --preset (or use --from-project).");
+            }
+
+            if (@ref == null)
+                return ResolveTemplatesDir(args, "templates"); // версионирование не запрошено — обычный путь
+
+            if (!PresetTag.IsValid(@ref))
+                throw new ArgumentException(
+                    $"Invalid version ref '{@ref}': expected '<preset>-v<major>.<minor>' (e.g. 'default-v1.0').");
+
+            var repoRoot = TemplateRefResolver.FindRepoRoot(Directory.GetCurrentDirectory());
+            worktree = TemplateRefResolver.Materialize(repoRoot, preset!, @ref);
+            Console.WriteLine($"Materialized templates at ref '{@ref}': {worktree.TemplatesDir}");
+            return worktree.TemplatesDir;
         }
 
         /// <summary>

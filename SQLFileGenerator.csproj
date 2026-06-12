@@ -17,6 +17,10 @@
     <Compile Remove="SqlGenerator.Mcp\**" />
     <EmbeddedResource Remove="SqlGenerator.Mcp\**" />
     <None Remove="SqlGenerator.Mcp\**" />
+    <!-- Exclude test project from this compilation -->
+    <Compile Remove="SqlGenerator.Tests\**" />
+    <EmbeddedResource Remove="SqlGenerator.Tests\**" />
+    <None Remove="SqlGenerator.Tests\**" />
     <!-- Exclude generator output directories so generated .cs files do not enter compilation -->
     <Compile Remove="result\**" />
     <EmbeddedResource Remove="result\**" />

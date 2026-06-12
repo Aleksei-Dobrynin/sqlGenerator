@@ -31,7 +31,7 @@ Parse a PostgreSQL SQL file using regex. Fast, works for simple DDL.
 
 **Returns:** `{ success, tableCount, tables[], schemaFile }`
 
-**Limitations:** Regex parser. Tolerates SQL line/block comments and multi-word types (`timestamp with time zone`, `double precision`, `character varying`). May still fail on advanced DDL: partitioning, INHERITS, exclusion constraints, expression indexes. For complex SQL, use the agent-parsing workflow instead.
+**Limitations:** Regex parser. Tolerates SQL line/block comments, multi-word types (`timestamp with time zone`, `double precision`, `character varying`), quoted/schema-qualified identifiers (`"User"`, `public."User"`), and primary keys declared inline, table-level (`PRIMARY KEY (...)`) or via `ALTER TABLE ... ADD ... PRIMARY KEY`. May still fail on advanced DDL: partitioning, INHERITS, exclusion constraints, expression indexes. For complex SQL, use the agent-parsing workflow instead.
 
 ### SaveSchema
 
@@ -117,6 +117,27 @@ Agent -> ParseSql(sqlFilePath) -> GenerateFiles(schemaFile, outputDir, presetNam
 4. Agent -> SaveSchema(schemaFilePath, outputPath)
 5. Agent -> GenerateFiles(schemaFile, outputDir, presetName)
 ```
+
+### Batch-transplant mode (preferred for full-module scaffolding)
+
+For full-module / multi-table scaffolding into a real project, this is the **recommended default**.
+The agent drives the utility **as an MCP server** and **parses the schema itself** (the agent-parsing
+flow above) rather than relying on the built-in parsers — the regex parser stumbles on real pg_dumps
+(quoted identifiers, table-level / `ALTER` primary keys), so for non-trivial DDL the agent parses.
+
+Five phases (compiler/toolchain as the error oracle):
+
+```
+[precondition: infra basis present in the project]
+1. Generate (batch)    agent parses -> SaveSchema -> GenerateFiles into scratch (not the project tree)
+2. Bulk transplant     one scripted move: generator-folder -> project layer
+3. Diagnostics oracle  one build + typecheck/build + lint pass -> FULL error list
+4. Batch-fix           fix per error class, cascading -> specific; rebuild until green
+5. Verify              CRUD / runtime against a live DB
+```
+
+Full step-by-step guide (source of truth): [`runbooks/batch-transplant-workflow.md`](runbooks/batch-transplant-workflow.md).
+Phase 3–5 details: [`docs/batch/`](docs/batch/).
 
 ## Schema JSON Format
 

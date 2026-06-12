@@ -180,6 +180,11 @@ Agent:
   5. → generate_files("schema.json", outputDir)
 ```
 
+**Генерация целого модуля с встраиванием в проект — batch-transplant (предпочтительный режим):**
+агент генерирует партию через MCP и встраивает её в проект, используя компилятор как оракул ошибок
+(5 фаз: generate → bulk transplant → diagnostics → batch-fix → verify). Полный гайд:
+[`runbooks/batch-transplant-workflow.md`](runbooks/batch-transplant-workflow.md).
+
 ### Формат JSON схемы
 
 ```json
