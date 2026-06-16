@@ -29,15 +29,15 @@ import { update{{ entity_name }} } from "api/{{ entity_name }}";
 import storeList from "../{{ entity_name }}ListView/store";
 {{~ end ~}}
 
-// Справочники для внешних ключей
+// Справочники для внешних ключей (импорт-алиас ключуется по колонке — два FK на одну таблицу не конфликтуют)
 {{~ for fk in foreign_keys ~}}
 {{~ if fk.column_name != parent_fk_col ~}}
-import { get{{ fk.references_table | to_pascal_case }}s } from "api/{{ fk.references_table | to_pascal_case }}";
+import { get{{ fk.references_table | to_pascal_case }}s as get{{ fk.column_name | remove_id_suffix | to_pascal_case }}List } from "api/{{ fk.references_table | to_pascal_case }}";
 {{~ end ~}}
 {{~ end ~}}
 {{~ for vfk in virtual_foreign_keys ~}}
 {{~ if vfk.column_name != parent_fk_col ~}}
-import { get{{ vfk.references_table | to_pascal_case }}s } from "api/{{ vfk.references_table | to_pascal_case }}";
+import { get{{ vfk.references_table | to_pascal_case }}s as get{{ vfk.column_name | remove_id_suffix | to_pascal_case }}List } from "api/{{ vfk.references_table | to_pascal_case }}";
 {{~ end ~}}
 {{~ end ~}}
 
@@ -47,7 +47,7 @@ class NewStore {
 {{~ if column.name != "id" && column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
 {{~ if column.csharp_type == "bool" ~}}
   {{ column.name }} = false;
-{{~ else if column.csharp_type == "int" || column.csharp_type == "long" ~}}
+{{~ else if column.csharp_type == "int" || column.csharp_type == "long" || column.csharp_type == "short" || column.csharp_type == "decimal" || column.csharp_type == "double" || column.csharp_type == "float" ~}}
   {{ column.name }} = 0;
 {{~ else if column.csharp_type == "DateTime" ~}}
   {{ column.name }} = null;
@@ -83,7 +83,7 @@ class NewStore {
 {{~ if column.name != "id" && column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
 {{~ if column.csharp_type == "bool" ~}}
       this.{{ column.name }} = false;
-{{~ else if column.csharp_type == "int" || column.csharp_type == "long" ~}}
+{{~ else if column.csharp_type == "int" || column.csharp_type == "long" || column.csharp_type == "short" || column.csharp_type == "decimal" || column.csharp_type == "double" || column.csharp_type == "float" ~}}
       this.{{ column.name }} = 0;
 {{~ else if column.csharp_type == "DateTime" ~}}
       this.{{ column.name }} = null;
@@ -120,8 +120,8 @@ class NewStore {
       id: this.id,
 {{~ for column in columns ~}}
 {{~ if column.name != "id" && column.name != "created_at" && column.name != "updated_at" && column.name != "created_by" && column.name != "updated_by" ~}}
-{{~ if column.csharp_type == "int" || column.csharp_type == "long" ~}}
-      {{ column.name }}: this.{{ column.name }} - 0,
+{{~ if column.csharp_type == "int" || column.csharp_type == "long" || column.csharp_type == "short" || column.csharp_type == "decimal" || column.csharp_type == "double" || column.csharp_type == "float" ~}}
+      {{ column.name }}: Number(this.{{ column.name }}),
 {{~ else if column.csharp_type == "DateTime" ~}}
       {{ column.name }}: this.{{ column.name }} ? dayjs(this.{{ column.name }}).format() : null,
 {{~ else ~}}
@@ -172,12 +172,12 @@ class NewStore {
     // Загрузка справочников
 {{~ for fk in foreign_keys ~}}
 {{~ if fk.column_name != parent_fk_col ~}}
-    await this.load{{ fk.references_table | to_pascal_case }}List();
+    await this.load{{ fk.column_name | remove_id_suffix | to_pascal_case }}List();
 {{~ end ~}}
 {{~ end ~}}
 {{~ for vfk in virtual_foreign_keys ~}}
 {{~ if vfk.column_name != parent_fk_col ~}}
-    await this.load{{ vfk.references_table | to_pascal_case }}List();
+    await this.load{{ vfk.column_name | remove_id_suffix | to_pascal_case }}List();
 {{~ end ~}}
 {{~ end ~}}
 
@@ -192,10 +192,10 @@ class NewStore {
 {{~ for fk in foreign_keys ~}}
 {{~ if fk.column_name != parent_fk_col ~}}
 
-  load{{ fk.references_table | to_pascal_case }}List = async () => {
+  load{{ fk.column_name | remove_id_suffix | to_pascal_case }}List = async () => {
     try {
       MainStore.changeLoader(true);
-      const response = await get{{ fk.references_table | to_pascal_case }}s();
+      const response = await get{{ fk.column_name | remove_id_suffix | to_pascal_case }}List();
       if ((response.status === 201 || response.status === 200) && response?.data !== null) {
         runInAction(() => {
           this.{{ fk.column_name | remove_id_suffix | to_snake_case }}_list = response.data;
@@ -214,10 +214,10 @@ class NewStore {
 {{~ for vfk in virtual_foreign_keys ~}}
 {{~ if vfk.column_name != parent_fk_col ~}}
 
-  load{{ vfk.references_table | to_pascal_case }}List = async () => {
+  load{{ vfk.column_name | remove_id_suffix | to_pascal_case }}List = async () => {
     try {
       MainStore.changeLoader(true);
-      const response = await get{{ vfk.references_table | to_pascal_case }}s();
+      const response = await get{{ vfk.column_name | remove_id_suffix | to_pascal_case }}List();
       if ((response.status === 201 || response.status === 200) && response?.data !== null) {
         runInAction(() => {
           this.{{ vfk.column_name | remove_id_suffix | to_snake_case }}_list = response.data;

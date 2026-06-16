@@ -85,6 +85,22 @@ namespace SQLFileGenerator
 
             return input;
         }
+
+        /// <summary>
+        /// Квотирует SQL-идентификатор PostgreSQL для безопасной вставки в C# verbatim-строку (@"...").
+        /// Оборачивает имя в двойные кавычки и удваивает их, т.к. внутри verbatim-литерала каждый `"`
+        /// обязан быть записан как `""`. Пример: "user" -> ""user"" (в выводе), что в рантайме даёт "user".
+        /// Уже стрипнутые имена не содержат кавычек; внутренние `"` (на всякий случай) экранируются.
+        /// </summary>
+        public static string QuoteIdent(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            // Внутренний `"` -> `""` (SQL-экранирование), затем ещё удвоение под verbatim-литерал.
+            var sqlEscaped = input.Replace("\"", "\"\"");
+            return "\"\"" + sqlEscaped + "\"\"";
+        }
     }
 
     /// <summary>
@@ -106,6 +122,10 @@ namespace SQLFileGenerator
             {
                 ProcessTemplatesDirectory(templatesDir, resultDir, table, tables, includeVirtualFks);
             }
+
+            // D-21/F-3: каркас словарей i18next (label/message/common) из схемы. Идемпотентно —
+            // существующие переводы не затираются. Язык по умолчанию "en".
+            LocaleGenerator.GenerateLocales(tables, resultDir);
         }
 
         /// <summary>
@@ -344,6 +364,7 @@ namespace SQLFileGenerator
                 scriptObject.Import("to_camel_case", new Func<string, string>(StringExtensions.ToCamelCase));
                 scriptObject.Import("to_snake_case", new Func<string, string>(StringExtensions.ToSnakeCase));
                 scriptObject.Import("remove_id_suffix", new Func<string, string>(StringExtensions.RemoveIdSuffix));
+                scriptObject.Import("quote_ident", new Func<string, string>(StringExtensions.QuoteIdent));
 
                 var context = new TemplateContext();
                 context.PushGlobal(scriptObject);

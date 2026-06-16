@@ -1,4 +1,4 @@
-﻿{{~
+{{~
   # ─── Детект родительского (mtm) FK (скрыт из полей формы) ───
   parent_fk_col = ""
   for fk in foreign_keys
@@ -14,9 +14,7 @@
     end
   end
 ~}}
-import React, { FC, useState } from "react";
-import { useNavigate } from 'react-router-dom';
-import { useLocation } from 'react-router';
+import React, { FC } from "react";
 import {
   Card,
   CardContent,
@@ -24,11 +22,7 @@ import {
   Divider,
   Paper,
   Grid,
-  Box,
-  Button,
   Container,
-  Typography,
-  Stack,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import store from "./store"
@@ -37,8 +31,6 @@ import LookUp from 'components/LookUp';
 import CustomTextField from "components/TextField";
 import CustomCheckbox from "components/Checkbox";
 import CustomDateField from "components/DateField";
-import InfoIcon from "@mui/icons-material/Info";
-import MainStore from "MainStore";
 
 type {{ entity_name }}TableProps = {
   children?: React.ReactNode;
@@ -51,7 +43,7 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
   return (
     <Container maxWidth='xl' sx={ { mt: 3 } } style={ { marginTop: props.isPopup ? 0 : 20, marginBottom: props.isPopup ? 0 : 20 } }>
       <Grid container spacing={3}>
-        <Grid item md={props.isPopup ? 12 : 6}>
+        <Grid size={ { md: props.isPopup ? 12 : 6 } }>
           <form data-testid="{{ entity_name }}Form" id="{{ entity_name }}Form" autoComplete='off'>
             <Paper elevation={props.isPopup ? 0 : 7}>
               <Card>
@@ -67,7 +59,7 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
 {{~ if column.name != parent_fk_col ~}}
 {{~ if column.is_foreign_key ~}}
                     {/* FK Lookup for {{ column.name }} */}
-                    <Grid item md={12} xs={12}>
+                    <Grid size={ { xs: 12, md: 12 } }>
                       <LookUp
                         value={store.{{ column.name }}}
                         onChange={(event) => store.handleChange(event)}
@@ -80,7 +72,7 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
                       />
                     </Grid>
 {{~ else if column.csharp_type == "bool" ~}}
-                    <Grid item md={12} xs={12}>
+                    <Grid size={ { xs: 12, md: 12 } }>
                       <CustomCheckbox
                         value={store.{{ column.name }}}
                         onChange={(event) => store.handleChange(event)}
@@ -90,7 +82,7 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
                       />
                     </Grid>
 {{~ else if column.csharp_type == "DateTime" ~}}
-                    <Grid item md={12} xs={12}>
+                    <Grid size={ { xs: 12, md: 12 } }>
                       <CustomDateField
                         value={store.{{ column.name }}}
                         onChange={(event) => store.handleChange(event)}
@@ -102,7 +94,7 @@ const {{ entity_name }}AddEditBaseView: FC<{{ entity_name }}TableProps> = observ
                       />
                     </Grid>
 {{~ else ~}}
-                    <Grid item md={12} xs={12}>
+                    <Grid size={ { xs: 12, md: 12 } }>
                       <CustomTextField
                         value={store.{{ column.name }}}
                         onChange={(event) => store.handleChange(event)}

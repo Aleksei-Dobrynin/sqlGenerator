@@ -38,12 +38,12 @@ const {{ entity_name }}AddEditView: FC<{{ entity_name }}Props> = observer((props
     <{{ entity_name }}AddEditBaseView {...props}>
 
       {store.id > 0 && (
-        <Grid item xs={12}>
+        <Grid size={ { xs: 12 } }>
           <MtmTabs />
         </Grid>
       )}
 
-      <Grid item xs={12} spacing={0}>
+      <Grid size={ { xs: 12 } }>
         <Box display="flex" p={2}>
           <Box m={2}>
             <CustomButton

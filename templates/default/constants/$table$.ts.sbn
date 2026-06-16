@@ -1,11 +1,12 @@
 export type {{ entity_name }} = {
 {{~ for column in columns ~}}
+{{~ opt = (column.name == "created_at" || column.name == "updated_at" || column.name == "created_by" || column.name == "updated_by") ? "?" : "" ~}}
 {{~ if column.csharp_type == "bool" ~}}
-  {{ column.name }}: boolean;
+  {{ column.name }}{{ opt }}: boolean;
 {{~ else if column.csharp_type == "int" || column.csharp_type == "long" || column.csharp_type == "short" || column.csharp_type == "decimal" || column.csharp_type == "double" || column.csharp_type == "float" ~}}
-  {{ column.name }}: number;
+  {{ column.name }}{{ opt }}: number;
 {{~ else ~}}
-  {{ column.name }}: string;
+  {{ column.name }}{{ opt }}: string;
 {{~ end ~}}
 {{~ end ~}}
 };

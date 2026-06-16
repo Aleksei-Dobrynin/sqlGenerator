@@ -36,7 +36,7 @@ public class SqlGeneratorTools
             }
 
             var sql = File.ReadAllText(fullSqlPath);
-            var tables = SqlParser.ParsePostgresCreateTableScript(sql);
+            var tables = SqlParser.ParsePostgresCreateTableScript(sql, out var parseWarnings);
 
             if (includeVirtualFks)
                 VirtualForeignKeyResolver.ResolveVirtualForeignKeys(tables);
@@ -60,7 +60,8 @@ public class SqlGeneratorTools
                 Success = true,
                 TableCount = tables.Count,
                 TableNames = tables.Select(t => t.EntityName).ToArray(),
-                SchemaFile = fullPath
+                SchemaFile = fullPath,
+                Warnings = parseWarnings.Count > 0 ? parseWarnings.ToArray() : null
             };
         }
         catch (Exception ex)
@@ -442,6 +443,10 @@ public class ParseSqlResult
     [JsonPropertyName("schemaFile")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? SchemaFile { get; set; }
+
+    [JsonPropertyName("warnings")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string[]? Warnings { get; set; }
 
     [JsonPropertyName("error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -114,7 +114,17 @@ Available template variables:
 - `virtual_foreign_keys` - Virtual FK relationships inferred from naming conventions (enabled by default, disable with `--no-virtual-fks`)
 - `virtual_all_tables` - All tables with combined real + virtual FKs (for cross-table relationships including inferred ones)
 
-Helper functions: `map_type`, `to_pascal_case`, `to_camel_case`, `to_snake_case`, `remove_id_suffix`
+Helper functions: `map_type`, `to_pascal_case`, `to_camel_case`, `to_snake_case`, `remove_id_suffix`, `quote_ident`
+
+`quote_ident` (`StringExtensions.QuoteIdent`, Generator.cs) — квотирует SQL-идентификатор PostgreSQL для
+безопасной вставки в C# **verbatim**-строку (`@"..."`): оборачивает в `"` и удваивает кавычки под verbatim
+(`user` → `""user""`, в рантайме `"user"`). Schema-префикс (`public.`) НЕ навязывается — квотируется только имя.
+
+**i18n-словари (пресет `default` v2.0):** после генерации движок эмитит каркас
+`<output>/public/locales/en/{label,message,common}.json` (`LocaleGenerator.GenerateLocales`, вызывается из
+`FileGenerator.GenerateOtherFiles`) — закрывает дефект D-21/F-3. Ключи `label` строятся из схемы
+(`<Entity>AddEditView`/`<Entity>ListView` × поля + `entityTitle`), значения — humanized-заглушки.
+**Идемпотентно**: существующие переводы не затираются. Язык по умолчанию `en`.
 
 ### File Layout
 
@@ -137,6 +147,15 @@ LlmParser/         # LLM parser module
 - FK parsing handles both inline `REFERENCES` in columns and separate `ALTER TABLE ADD CONSTRAINT` statements
 - PK parsing handles inline (`id int PRIMARY KEY`), table-level (`PRIMARY KEY (a, b)`, compound) and `ALTER TABLE ... ADD ... PRIMARY KEY (cols)`. Table-level constraint lines (`PRIMARY KEY`/`UNIQUE`/`FOREIGN KEY`/`CHECK`/`EXCLUDE`/`CONSTRAINT`) распознаются в `ParseColumns` и не превращаются в колонки.
 - Quoted-идентификаторы и schema-qualified имена (`"User"`, `public."User"`) парсятся и нормализуются (`StripQuotes`) для таблиц, REFERENCES и ALTER-конструкций.
+- Parser возвращает overload `ParsePostgresCreateTableScript(sql, out warnings)`: warning, если распарсено меньше таблиц, чем операторов `CREATE TABLE` (тихая потеря — D-5). Прокидывается в MCP `parse_sql` → `warnings[]`.
+
+### Пресет `default` v2.0 — поведение шаблонов (defect remediation, тег `default-v2.0`)
+
+- **entity** НЕ наследует `BaseLogDomain`; snake-поля колонок как есть. nullable-колонки (вкл. string) → `T?`; не добавляет `?`, если `CSharpType` уже оканчивается на `?`.
+- **dto** уважает `IsNullable` симметрично entity (NOT NULL → `T`, nullable → `T?`) → контроллерный маппинг `entity = dto` компилируется.
+- **repo/usecase/dto/controller/irepo** берут имя и тип PK из схемы (`primary_key.name`/`.csharp_type`), а не хардкод `id`/`int` (fallback на `id`/`int`). Весь SQL в repo — verbatim с `quote_ident` на таблицах/колонках. `FillLogDataHelper` зовётся только при наличии audit-колонок.
+- **frontend**: Grid MUI v7 `size={ { } }`; audit-поля в `constants/*` опциональны; `api/*` кладёт `orderBy`/`orderType` в URL; числовые не-FK коэрсятся `Number()`; два FK на одну таблицу разводятся по колонке (без коллизий лоадеров).
+- Полная карта дефектов и статусов: `SQL_GENERATOR_TEMPLATE_DEFECTS.md` + `docs/defects/`.
 
 ## MCP Server (`SqlGenerator.Mcp/`)
 
