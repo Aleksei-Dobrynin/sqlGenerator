@@ -1,4 +1,20 @@
-﻿using System.Data;
+{{~
+  # Имя и тип PK из схемы (fallback на int id).
+  pk_name = "id"
+  pk_type = "int"
+  if primary_key
+    pk_name = primary_key.name
+    pk_type = primary_key.csharp_type
+  end
+  # Есть ли audit-колонки (от них зависит вызов FillLogDataHelper).
+  has_audit = false
+  for column in columns
+    if column.name == "created_at" || column.name == "updated_at" || column.name == "created_by" || column.name == "updated_by"
+      has_audit = true
+    end
+  end
+~}}
+using System.Data;
 using Dapper;
 using Domain.Entities;
 using Application.Repositories;
@@ -31,7 +47,7 @@ namespace Infrastructure.Repositories
         {
             try
             {
-                var sql = "SELECT * FROM {{ table_name }}";
+                var sql = @"SELECT * FROM {{ table_name | quote_ident }}";
                 var models = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, transaction: _dbTransaction);
                 return models.ToList();
             }
@@ -41,11 +57,11 @@ namespace Infrastructure.Repositories
             }
         }
 
-        public async Task<{{ entity_name }}> GetOneByID(int id)
+        public async Task<{{ entity_name }}> GetOneByID({{ pk_type }} id)
         {
             try
             {
-                var sql = "SELECT * FROM {{ table_name }} WHERE id = @Id LIMIT 1";
+                var sql = @"SELECT * FROM {{ table_name | quote_ident }} WHERE {{ pk_name | quote_ident }} = @Id LIMIT 1";
                 var model = await _dbConnection.QuerySingleOrDefaultAsync<{{ entity_name }}>(sql, new { Id = id }, transaction: _dbTransaction);
 
                 if (model == null)
@@ -61,7 +77,7 @@ namespace Infrastructure.Repositories
             }
         }
 
-        public async Task<int> Add({{ entity_name }} domain)
+        public async Task<{{ pk_type }}> Add({{ entity_name }} domain)
         {
             try
             {
@@ -70,17 +86,19 @@ namespace Infrastructure.Repositories
                 var model = new {{ entity_name }}
                 {
 {{~ for column in columns ~}}
-{{~ if column.Name != "id" ~}}
-                    {{ column.Name }} = domain.{{ column.Name }},
+{{~ if column.name != pk_name ~}}
+                    {{ column.name }} = domain.{{ column.name }},
 {{~ end ~}}
 {{~ end ~}}
                 };
+{{~ if has_audit ~}}
                 await FillLogDataHelper.FillLogDataCreate(model, userId);
+{{~ end ~}}
 
-                var sql = @"INSERT INTO {{ table_name }}({{~ for column in columns ~}}{{~ if column.Name != "id" ~}}{{ column.Name }}{{~ if !for.last ~}}, {{~ end ~}}{{~ end ~}}{{~ end ~}}) 
-                           VALUES ({{~ for column in columns ~}}{{~ if column.Name != "id" ~}}@{{ column.Name }}{{~ if !for.last ~}}, {{~ end ~}}{{~ end ~}}{{~ end ~}}) 
-                           RETURNING id";
-                var result = await _dbConnection.ExecuteScalarAsync<int>(sql, model, transaction: _dbTransaction);
+                var sql = @"INSERT INTO {{ table_name | quote_ident }}({{~ first = true ~}}{{~ for column in columns ~}}{{~ if column.name != pk_name ~}}{{ first ? "" : ", " }}{{ column.name | quote_ident }}{{~ first = false ~}}{{~ end ~}}{{~ end }})
+                           VALUES ({{~ first = true ~}}{{~ for column in columns ~}}{{~ if column.name != pk_name ~}}{{ first ? "" : ", " }}@{{ column.name }}{{~ first = false ~}}{{~ end ~}}{{~ end }})
+                           RETURNING {{ pk_name | quote_ident }}";
+                var result = await _dbConnection.ExecuteScalarAsync<{{ pk_type }}>(sql, model, transaction: _dbTransaction);
                 return result;
             }
             catch (Exception ex)
@@ -98,12 +116,14 @@ namespace Infrastructure.Repositories
                 var model = new {{ entity_name }}
                 {
 {{~ for column in columns ~}}
-                    {{ column.Name }} = domain.{{ column.Name }},
+                    {{ column.name }} = domain.{{ column.name }},
 {{~ end ~}}
                 };
+{{~ if has_audit ~}}
                 await FillLogDataHelper.FillLogDataUpdate(model, userId);
+{{~ end ~}}
 
-                var sql = @"UPDATE {{ table_name }} SET {{ for column in columns }}{{~ if column.Name != "id" ~}}{{ column.Name }} = @{{ column.Name }}{{~ if !for.last ~}}, {{ end ~}}{{~ end ~}}{{ end }} WHERE id = @id";
+                var sql = @"UPDATE {{ table_name | quote_ident }} SET {{ first = true ~}}{{~ for column in columns ~}}{{~ if column.name != pk_name ~}}{{ first ? "" : ", " }}{{ column.name | quote_ident }} = @{{ column.name }}{{~ first = false ~}}{{~ end ~}}{{~ end }} WHERE {{ pk_name | quote_ident }} = @{{ pk_name }}";
                 var affected = await _dbConnection.ExecuteAsync(sql, model, transaction: _dbTransaction);
                 if (affected == 0)
                 {
@@ -120,10 +140,10 @@ namespace Infrastructure.Repositories
         {
             try
             {
-                var sql = "SELECT * FROM {{ table_name }} OFFSET @pageSize * (@pageNumber - 1) LIMIT @pageSize";
+                var sql = @"SELECT * FROM {{ table_name | quote_ident }} OFFSET @pageSize * (@pageNumber - 1) LIMIT @pageSize";
                 var models = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, new { pageSize, pageNumber }, transaction: _dbTransaction);
 
-                var sqlCount = "SELECT COUNT(*) FROM {{ table_name }}";
+                var sqlCount = @"SELECT COUNT(*) FROM {{ table_name | quote_ident }}";
                 var totalItems = await _dbConnection.ExecuteScalarAsync<int>(sqlCount, transaction: _dbTransaction);
 
                 var domainItems = models.ToList();
@@ -136,11 +156,11 @@ namespace Infrastructure.Repositories
             }
         }
 
-        public async Task Delete(int id)
+        public async Task Delete({{ pk_type }} id)
         {
             try
             {
-                var sql = "DELETE FROM {{ table_name }} WHERE id = @Id";
+                var sql = @"DELETE FROM {{ table_name | quote_ident }} WHERE {{ pk_name | quote_ident }} = @Id";
                 var affected = await _dbConnection.ExecuteAsync(sql, new { Id = id }, transaction: _dbTransaction);
 
                 if (affected == 0)
@@ -159,7 +179,7 @@ namespace Infrastructure.Repositories
         {
             try
             {
-                var sql = "SELECT * FROM {{ table_name }} WHERE {{ fk.column_name }} = @{{ fk.column_name }}";
+                var sql = @"SELECT * FROM {{ table_name | quote_ident }} WHERE {{ fk.column_name | quote_ident }} = @{{ fk.column_name }}";
                 var models = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, new { {{ fk.column_name }} }, transaction: _dbTransaction);
                 return models.ToList();
             }
@@ -177,7 +197,7 @@ namespace Infrastructure.Repositories
         {
             try
             {
-                var sql = "SELECT * FROM {{ table_name }} WHERE {{ vfk.column_name }} = @{{ vfk.column_name }}";
+                var sql = @"SELECT * FROM {{ table_name | quote_ident }} WHERE {{ vfk.column_name | quote_ident }} = @{{ vfk.column_name }}";
                 var models = await _dbConnection.QueryAsync<{{ entity_name }}>(sql, new { {{ vfk.column_name }} }, transaction: _dbTransaction);
                 return models.ToList();
             }

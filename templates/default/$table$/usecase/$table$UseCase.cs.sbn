@@ -1,4 +1,13 @@
-﻿using Application.Models;
+{{~
+  # Имя и тип PK из схемы (fallback на int id).
+  pk_name = "id"
+  pk_type = "int"
+  if primary_key
+    pk_name = primary_key.name
+    pk_type = primary_key.csharp_type
+  end
+~}}
+using Application.Models;
 using Application.Repositories;
 using Domain.Entities;
 
@@ -17,8 +26,8 @@ namespace Application.UseCases
         {
             return unitOfWork.{{ entity_name }}Repository.GetAll();
         }
-        
-        public Task<{{ entity_name }}> GetOneByID(int id)
+
+        public Task<{{ entity_name }}> GetOneByID({{ pk_type }} id)
         {
             return unitOfWork.{{ entity_name }}Repository.GetOneByID(id);
         }
@@ -42,7 +51,7 @@ namespace Application.UseCases
         public async Task<{{ entity_name }}> Create({{ entity_name }} domain)
         {
             var result = await unitOfWork.{{ entity_name }}Repository.Add(domain);
-            domain.id = result;
+            domain.{{ pk_name }} = result;
             unitOfWork.Commit();
             return domain;
         }
@@ -54,14 +63,14 @@ namespace Application.UseCases
             return domain;
         }
 
-        public Task<PaginatedList<{{ entity_name }}>> GetPagniated(int pageSize, int pageNumber)
+        public Task<PaginatedList<{{ entity_name }}>> GetPaginated(int pageSize, int pageNumber)
         {
             if (pageSize < 1) pageSize = 1;
             if (pageNumber < 1) pageNumber = 1;
             return unitOfWork.{{ entity_name }}Repository.GetPaginated(pageSize, pageNumber);
         }
 
-        public async Task Delete(int id)
+        public async Task Delete({{ pk_type }} id)
         {
             await unitOfWork.{{ entity_name }}Repository.Delete(id);
             unitOfWork.Commit();

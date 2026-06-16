@@ -1,4 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+{{~
+  # Имя и тип PK из схемы (fallback на int id).
+  pk_name = "id"
+  pk_type = "int"
+  if primary_key
+    pk_name = primary_key.name
+    pk_type = primary_key.csharp_type
+  end
+~}}
+using Microsoft.AspNetCore.Mvc;
 using WebApi.Dtos;
 using Application.UseCases;
 
@@ -25,7 +34,7 @@ namespace WebApi.Controllers
 
         [HttpGet]
         [Route("GetOneById")]
-        public async Task<IActionResult> GetOneById(int id)
+        public async Task<IActionResult> GetOneById({{ pk_type }} id)
         {
             var response = await _{{ entity_name | to_camel_case }}UseCases.GetOneByID(id);
             return Ok(response);
@@ -57,7 +66,7 @@ namespace WebApi.Controllers
         [Route("GetPaginated")]
         public async Task<IActionResult> GetPaginated(int pageSize, int pageNumber)
         {
-            var response = await _{{ entity_name | to_camel_case }}UseCases.GetPagniated(pageSize, pageNumber);
+            var response = await _{{ entity_name | to_camel_case }}UseCases.GetPaginated(pageSize, pageNumber);
             return Ok(response);
         }
 
@@ -68,7 +77,7 @@ namespace WebApi.Controllers
             var request = new Domain.Entities.{{ entity_name }}
             {
 {{~ for column in columns ~}}
-{{~ if column.Name != "id" ~}}
+{{~ if column.name != pk_name ~}}
                 {{ column.Name }} = requestDto.{{ column.Name }},
 {{~ end ~}}
 {{~ end ~}}
@@ -93,7 +102,7 @@ namespace WebApi.Controllers
 
         [HttpDelete]
         [Route("Delete")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete({{ pk_type }} id)
         {
             await _{{ entity_name | to_camel_case }}UseCases.Delete(id);
             return Ok();

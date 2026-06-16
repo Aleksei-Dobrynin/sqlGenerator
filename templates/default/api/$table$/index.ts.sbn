@@ -11,9 +11,11 @@ export const get{{ entity_name }}sPagination = (
   orderBy: string | null,
   orderType: string | null
 ): Promise<any> => {
-  return http.get(
-    "/{{ entity_name }}/GetPaginated?pageSize=" + pageSize + "&pageNumber=" + (pageNumber + 1)
-  );
+  let url =
+    "/{{ entity_name }}/GetPaginated?pageSize=" + pageSize + "&pageNumber=" + (pageNumber + 1);
+  if (orderBy) url += "&orderBy=" + orderBy;
+  if (orderType) url += "&orderType=" + orderType;
+  return http.get(url);
 };
 
 export const get{{ entity_name }} = (id: number): Promise<any> => {

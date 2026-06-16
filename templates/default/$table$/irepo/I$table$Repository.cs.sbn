@@ -1,4 +1,13 @@
-﻿using Application.Models;
+{{~
+  # Имя и тип PK из схемы (fallback на int id).
+  pk_name = "id"
+  pk_type = "int"
+  if primary_key
+    pk_name = primary_key.name
+    pk_type = primary_key.csharp_type
+  end
+~}}
+using Application.Models;
 using Domain.Entities;
 
 namespace Application.Repositories
@@ -6,11 +15,11 @@ namespace Application.Repositories
     public interface I{{ entity_name }}Repository : BaseRepository
     {
         Task<List<{{ entity_name }}>> GetAll();
-        Task<{{ entity_name }}> GetOneByID(int id);
+        Task<{{ entity_name }}> GetOneByID({{ pk_type }} id);
         Task<PaginatedList<{{ entity_name }}>> GetPaginated(int pageSize, int pageNumber);
-        Task<int> Add({{ entity_name }} domain);
+        Task<{{ pk_type }}> Add({{ entity_name }} domain);
         Task Update({{ entity_name }} domain);
-        Task Delete(int id);
+        Task Delete({{ pk_type }} id);
 {{~ for fk in foreign_keys ~}}
         Task<List<{{ entity_name }}>> GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}({{ fk.csharp_type }} {{ fk.column_name }});
 {{~ end ~}}

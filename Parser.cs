@@ -20,7 +20,15 @@ namespace SQLFileGenerator
         /// <param name="sqlScript">SQL-скрипт с командами CREATE TABLE для PostgreSQL</param>
         /// <returns>Список объектов TableSchema, представляющих структуру таблиц базы данных</returns>
         public static List<TableSchema> ParsePostgresCreateTableScript(string sqlScript)
+            => ParsePostgresCreateTableScript(sqlScript, out _);
+
+        /// <summary>
+        /// Перегрузка с диагностикой: возвращает предупреждения о тихо пропущенных CREATE TABLE
+        /// (D-5: regex-парсер мог не распознать таблицу — напр. необычное тело — и потерять её без ошибки).
+        /// </summary>
+        public static List<TableSchema> ParsePostgresCreateTableScript(string sqlScript, out List<string> warnings)
         {
+            warnings = new List<string>();
             var tables = new List<TableSchema>();
 
             // Strip SQL comments before regex matching:
@@ -73,6 +81,19 @@ namespace SQLFileGenerator
 
             // Обрабатываем ALTER TABLE для PRIMARY KEY
             ProcessAlterTablePrimaryKeys(sqlScript, tableDict, alterTablePkRegex);
+
+            // D-5: сверяем число операторов CREATE TABLE с числом распарсенных таблиц. Если меньше —
+            // часть таблиц молча пропущена (вероятно нестандартное тело/синтаксис) → предупреждаем,
+            // чтобы success:true не создавал ложного впечатления полного разбора.
+            var createTableStatements = Regex.Matches(sqlScript, @"CREATE\s+TABLE", RegexOptions.IgnoreCase).Count;
+            if (createTableStatements > tables.Count)
+            {
+                var warning = $"Распознано {tables.Count} из {createTableStatements} операторов CREATE TABLE; " +
+                              $"{createTableStatements - tables.Count} пропущено (возможен неподдерживаемый синтаксис тела таблицы). " +
+                              "Проверьте схему — часть таблиц могла быть потеряна.";
+                warnings.Add(warning);
+                Console.WriteLine($"WARNING: {warning}");
+            }
 
             return tables;
         }

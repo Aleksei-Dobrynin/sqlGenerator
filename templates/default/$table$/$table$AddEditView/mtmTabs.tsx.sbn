@@ -32,6 +32,14 @@
     end
   end
 ~}}
+{{~ if child_tables.size == 0 ~}}
+import { observer } from 'mobx-react';
+
+// Нет связанных (mtm) таблиц — пустой компонент (без неиспользуемых импортов/хелперов)
+const {{ entity_name }}MtmTabs = observer(() => null);
+
+export default {{ entity_name }}MtmTabs;
+{{~ else ~}}
 import * as React from 'react';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
@@ -52,11 +60,6 @@ const {{ entity_name }}MtmTabs = observer(() => {
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
-{{~ if child_tables.size == 0 ~}}
-
-  // Нет связанных таблиц
-  return null;
-{{~ else ~}}
 
   return (
     <Box component={Paper} elevation={5}>
@@ -74,7 +77,6 @@ const {{ entity_name }}MtmTabs = observer(() => {
 {{~ end ~}}
     </Box>
   );
-{{~ end ~}}
 })
 
 interface TabPanelProps {
@@ -107,3 +109,4 @@ function a11yProps(index: number) {
 }
 
 export default {{ entity_name }}MtmTabs;
+{{~ end ~}}

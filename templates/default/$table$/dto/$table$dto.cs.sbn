@@ -1,14 +1,21 @@
+{{~
+  # Имя PK берём из схемы (а не хардкодим "id"); fallback на "id", если PK не задан.
+  pk_name = "id"
+  if primary_key
+    pk_name = primary_key.name
+  end
+~}}
 namespace WebApi.Dtos
 {
     public class Create{{ entity_name }}Request
     {
 {{~ for column in columns ~}}
-{{~ if column.Name != "id" ~}}
-        {{~ if column.CSharpType != "string" ~}}
+{{~ if column.name != pk_name ~}}
+{{~ if column.IsNullable && !(column.CSharpType | string.ends_with "?") ~}}
         public {{ column.CSharpType }}? {{ column.Name }} { get; set; }
-        {{~ else ~}}
+{{~ else ~}}
         public {{ column.CSharpType }} {{ column.Name }} { get; set; }
-        {{~ end ~}}
+{{~ end ~}}
 {{~ end ~}}
 {{~ end ~}}
     }
@@ -16,15 +23,15 @@ namespace WebApi.Dtos
     public class Update{{ entity_name }}Request
     {
 {{~ for column in columns ~}}
-        {{~ if column.Name == "id" ~}}
+{{~ if column.name == pk_name ~}}
         public {{ column.CSharpType }} {{ column.Name }} { get; set; }
-        {{~ else ~}}
-            {{~ if column.CSharpType != "string" ~}}
+{{~ else ~}}
+{{~ if column.IsNullable && !(column.CSharpType | string.ends_with "?") ~}}
         public {{ column.CSharpType }}? {{ column.Name }} { get; set; }
-            {{~ else ~}}
+{{~ else ~}}
         public {{ column.CSharpType }} {{ column.Name }} { get; set; }
-            {{~ end ~}}
-        {{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}
 {{~ end ~}}
     }
 }
