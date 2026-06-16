@@ -10,11 +10,16 @@ I{{ entity_name }}Repository {{ entity_name }}Repository { get; }
 
 
 // ─── Infrastructure/Data/UnitOfWork.cs ───
+// ВНИМАНИЕ: репозиторий теперь требует ILogger<{{ entity_name }}Repository> (observability, D-24).
+// UnitOfWork должен принимать ILoggerFactory в конструкторе (один раз на весь UoW) и отдавать
+// логгеры репозиториям через _loggerFactory.CreateLogger<...>(). Также рекомендуется логировать
+// исключение в Commit()/Rollback() перед откатом транзакции (D-25) — ручная зона проекта.
+//
 // Добавьте приватное поле:
 
 private I{{ entity_name }}Repository? _{{ entity_name | to_camel_case }}Repository;
 
-// ...и ленивое свойство:
+// ...и ленивое свойство (logger из _loggerFactory):
 
 public I{{ entity_name }}Repository {{ entity_name }}Repository
 {
@@ -22,7 +27,7 @@ public I{{ entity_name }}Repository {{ entity_name }}Repository
     {
         if (_{{ entity_name | to_camel_case }}Repository == null)
         {
-            _{{ entity_name | to_camel_case }}Repository = new {{ entity_name }}Repository(_dbConnection, _userRepository);
+            _{{ entity_name | to_camel_case }}Repository = new {{ entity_name }}Repository(_dbConnection, _userRepository, _loggerFactory.CreateLogger<{{ entity_name }}Repository>());
             _{{ entity_name | to_camel_case }}Repository.SetTransaction(_dbTransaction);
         }
         return _{{ entity_name | to_camel_case }}Repository;
@@ -31,7 +36,10 @@ public I{{ entity_name }}Repository {{ entity_name }}Repository
 
 
 // ─── WebApi/Program.cs ───
-// Зарегистрируйте репозиторий и use-case в DI:
+// Зарегистрируйте репозиторий и use-case в DI.
+// ВНИМАНИЕ: {{ entity_name }}UseCases теперь требует ILogger<{{ entity_name }}UseCases>, а
+// {{ entity_name }}Controller — ILogger<{{ entity_name }}Controller> (резолвятся автоматически
+// штатной регистрацией логирования ASP.NET — AddLogging/CreateDefaultBuilder).
 
 builder.Services.AddScoped<I{{ entity_name }}Repository, {{ entity_name }}Repository>();
 builder.Services.AddScoped<{{ entity_name }}UseCases>();

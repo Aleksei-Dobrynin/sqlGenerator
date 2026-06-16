@@ -10,16 +10,19 @@
 using Application.Models;
 using Application.Repositories;
 using Domain.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace Application.UseCases
 {
     public class {{ entity_name }}UseCases
     {
         private readonly IUnitOfWork unitOfWork;
+        private readonly ILogger<{{ entity_name }}UseCases> _logger;
 
-        public {{ entity_name }}UseCases(IUnitOfWork unitOfWork)
+        public {{ entity_name }}UseCases(IUnitOfWork unitOfWork, ILogger<{{ entity_name }}UseCases> logger)
         {
             this.unitOfWork = unitOfWork;
+            _logger = logger;
         }
 
         public Task<List<{{ entity_name }}>> GetAll()
@@ -52,14 +55,30 @@ namespace Application.UseCases
         {
             var result = await unitOfWork.{{ entity_name }}Repository.Add(domain);
             domain.{{ pk_name }} = result;
-            unitOfWork.Commit();
+            try
+            {
+                unitOfWork.Commit();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Commit failed for {Operation} {Entity}", "Create", "{{ entity_name }}");
+                throw;
+            }
             return domain;
         }
 
         public async Task<{{ entity_name }}> Update({{ entity_name }} domain)
         {
             await unitOfWork.{{ entity_name }}Repository.Update(domain);
-            unitOfWork.Commit();
+            try
+            {
+                unitOfWork.Commit();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Commit failed for {Operation} {Entity}", "Update", "{{ entity_name }}");
+                throw;
+            }
             return domain;
         }
 
@@ -73,7 +92,15 @@ namespace Application.UseCases
         public async Task Delete({{ pk_type }} id)
         {
             await unitOfWork.{{ entity_name }}Repository.Delete(id);
-            unitOfWork.Commit();
+            try
+            {
+                unitOfWork.Commit();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Commit failed for {Operation} {Entity}", "Delete", "{{ entity_name }}");
+                throw;
+            }
         }
     }
 }
