@@ -120,7 +120,7 @@ Helper functions: `map_type`, `to_pascal_case`, `to_camel_case`, `to_snake_case`
 безопасной вставки в C# **verbatim**-строку (`@"..."`): оборачивает в `"` и удваивает кавычки под verbatim
 (`user` → `""user""`, в рантайме `"user"`). Schema-префикс (`public.`) НЕ навязывается — квотируется только имя.
 
-**i18n-словари (пресет `default` v2.0):** после генерации движок эмитит каркас
+**i18n-словари (введено в пресете `default` v2.0):** после генерации движок эмитит каркас
 `<output>/public/locales/en/{label,message,common}.json` (`LocaleGenerator.GenerateLocales`, вызывается из
 `FileGenerator.GenerateOtherFiles`) — закрывает дефект D-21/F-3. Ключи `label` строятся из схемы
 (`<Entity>AddEditView`/`<Entity>ListView` × поля + `entityTitle`), значения — humanized-заглушки.
@@ -149,12 +149,24 @@ LlmParser/         # LLM parser module
 - Quoted-идентификаторы и schema-qualified имена (`"User"`, `public."User"`) парсятся и нормализуются (`StripQuotes`) для таблиц, REFERENCES и ALTER-конструкций.
 - Parser возвращает overload `ParsePostgresCreateTableScript(sql, out warnings)`: warning, если распарсено меньше таблиц, чем операторов `CREATE TABLE` (тихая потеря — D-5). Прокидывается в MCP `parse_sql` → `warnings[]`.
 
-### Пресет `default` v2.0 — поведение шаблонов (defect remediation, тег `default-v2.0`)
+### Пресет `default` — поведение шаблонов (последний тег `default-v3.0`)
 
+Поведение кумулятивно: база v2.0 (defect remediation, тег `default-v2.0`) + слой observability v3.0
+(DI `ILogger`, тег `default-v3.0`, **breaking** — меняются сигнатуры конструкторов).
+
+**База v2.0 (`default-v2.0`):**
 - **entity** НЕ наследует `BaseLogDomain`; snake-поля колонок как есть. nullable-колонки (вкл. string) → `T?`; не добавляет `?`, если `CSharpType` уже оканчивается на `?`.
 - **dto** уважает `IsNullable` симметрично entity (NOT NULL → `T`, nullable → `T?`) → контроллерный маппинг `entity = dto` компилируется.
 - **repo/usecase/dto/controller/irepo** берут имя и тип PK из схемы (`primary_key.name`/`.csharp_type`), а не хардкод `id`/`int` (fallback на `id`/`int`). Весь SQL в repo — verbatim с `quote_ident` на таблицах/колонках. `FillLogDataHelper` зовётся только при наличии audit-колонок.
 - **frontend**: Grid MUI v7 `size={ { } }`; audit-поля в `constants/*` опциональны; `api/*` кладёт `orderBy`/`orderType` в URL; числовые не-FK коэрсятся `Number()`; два FK на одну таблицу разводятся по колонке (без коллизий лоадеров).
+
+**Слой observability v3.0 (`default-v3.0`, breaking — группа D-24/D-26/D-27):**
+- **repo** — ctor `+ ILogger<<Entity>Repository>`; в каждом `catch` `_logger.LogError(ex, "{Operation} {Entity} failed", …)` перед `throw` (D-24). `IUserRepository` в ctor **сохранён** (его снятие — D-04/D-05/OT-1, вне группы).
+- **usecase** — ctor `+ ILogger<<Entity>UseCases>`; `unitOfWork.Commit()` в Create/Update/Delete обёрнут в `try/catch` с `LogError` + rethrow (D-26).
+- **controller** — ctor `+ ILogger<<Entity>Controller>`; `LogInformation` в начало каждого экшена (тексты 1:1 из проектного `BaseController`) (D-27).
+- **integration-сниппет** — проводка `new …Repository(…, loggerFactory.CreateLogger<…>())` + ремарка: `UnitOfWork` ctor принимает `ILoggerFactory`, логировать в `Commit()/Rollback()` (D-25 — ручная зона проекта, т.к. `UnitOfWork.cs` не генерируется).
+- **⚠️ Контракт-breaking:** изменены сигнатуры конструкторов repo/usecase/controller → DI-проводка и рукописный `UnitOfWork` обязаны измениться при апгрейде потребителя на `default-v3.0`.
+- **OT-1 (открыто):** контракт «ambient infra» (`Infrastructure.Data.Models`, `UserSessionHelper`, `IUserRepository`/DI-цикл D-04/D-05) не решён в шаблоне — repo ctor всё ещё несёт `IUserRepository`.
 - Полная карта дефектов и статусов: `SQL_GENERATOR_TEMPLATE_DEFECTS.md` + `docs/defects/`.
 
 ## MCP Server (`SqlGenerator.Mcp/`)
