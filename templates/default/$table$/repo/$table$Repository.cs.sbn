@@ -22,6 +22,7 @@ using Infrastructure.Data.Models;
 using Application.Exceptions;
 using Application.Models;
 using System;
+using Microsoft.Extensions.Logging;
 using Infrastructure.FillLogData;
 
 namespace Infrastructure.Repositories
@@ -31,11 +32,13 @@ namespace Infrastructure.Repositories
         private readonly IDbConnection _dbConnection;
         private IDbTransaction? _dbTransaction;
         private IUserRepository _userRepository;
+        private readonly ILogger<{{ entity_name }}Repository> _logger;
 
-        public {{ entity_name }}Repository(IDbConnection dbConnection, IUserRepository userRepository)
+        public {{ entity_name }}Repository(IDbConnection dbConnection, IUserRepository userRepository, ILogger<{{ entity_name }}Repository> logger)
         {
             _dbConnection = dbConnection;
             _userRepository = userRepository;
+            _logger = logger;
         }
 
         public void SetTransaction(IDbTransaction dbTransaction)
@@ -53,6 +56,7 @@ namespace Infrastructure.Repositories
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "{Operation} {Entity} failed", "GetAll", "{{ entity_name }}");
                 throw new RepositoryException("Failed to get {{ entity_name }}", ex);
             }
         }
@@ -73,6 +77,7 @@ namespace Infrastructure.Repositories
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "{Operation} {Entity} failed", "GetOneByID", "{{ entity_name }}");
                 throw new RepositoryException("Failed to get {{ entity_name }}", ex);
             }
         }
@@ -103,6 +108,7 @@ namespace Infrastructure.Repositories
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "{Operation} {Entity} failed", "Add", "{{ entity_name }}");
                 throw new RepositoryException("Failed to add {{ entity_name }}", ex);
             }
         }
@@ -132,6 +138,7 @@ namespace Infrastructure.Repositories
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "{Operation} {Entity} failed", "Update", "{{ entity_name }}");
                 throw new RepositoryException("Failed to update {{ entity_name }}", ex);
             }
         }
@@ -152,6 +159,7 @@ namespace Infrastructure.Repositories
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "{Operation} {Entity} failed", "GetPaginated", "{{ entity_name }}");
                 throw new RepositoryException("Failed to get {{ entity_name }}", ex);
             }
         }
@@ -170,6 +178,7 @@ namespace Infrastructure.Repositories
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "{Operation} {Entity} failed", "Delete", "{{ entity_name }}");
                 throw new RepositoryException("Failed to delete {{ entity_name }}", ex);
             }
         }
@@ -185,6 +194,7 @@ namespace Infrastructure.Repositories
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "{Operation} {Entity} failed", "GetBy{{ fk.column_name | remove_id_suffix | to_pascal_case }}", "{{ entity_name }}");
                 throw new RepositoryException("Failed to get {{ entity_name }} by {{ fk.column_name }}", ex);
             }
         }
@@ -203,6 +213,7 @@ namespace Infrastructure.Repositories
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "{Operation} {Entity} failed", "GetBy{{ vfk.column_name | remove_id_suffix | to_pascal_case }}", "{{ entity_name }}");
                 throw new RepositoryException("Failed to get {{ entity_name }} by {{ vfk.column_name }}", ex);
             }
         }
